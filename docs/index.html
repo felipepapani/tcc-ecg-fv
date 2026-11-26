@@ -71,6 +71,18 @@ aside.controles { background: var(--painel); border: 1px solid var(--linha); bor
 .seg label:has(input:checked) .m { color: var(--tinta); }
 .seg label:has(input:focus-visible) { outline: 2px solid var(--qrs); outline-offset: -2px; }
 .seg-leg { font-size: 11.5px; line-height: 1.35; color: var(--tinta-2); margin: 0; }
+.tutorial { border: 1px solid var(--linha); border-radius: 5px; background: var(--papel); }
+.tutorial summary { cursor: pointer; padding: 8px 10px; font-size: 13.5px; font-weight: 600; color: var(--qrs); list-style-position: inside; }
+.tutorial[open] summary { border-bottom: 1px solid var(--linha); }
+.tut-corpo { padding: 4px 12px 12px; font-size: 12.5px; line-height: 1.5; color: var(--tinta-2); }
+.tut-corpo h3 { font-size: 13.5px; font-weight: 600; color: var(--tinta); margin: 12px 0 4px; display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; }
+.tut-corpo h3 span { font-family: var(--font-dado); font-size: 11px; font-weight: 400; color: var(--tinta-2); }
+.tut-corpo p { margin: 4px 0; }
+.tut-corpo ol, .tut-corpo ul { margin: 4px 0; padding-left: 18px; display: grid; gap: 3px; }
+.tut-corpo code { font-family: var(--font-dado); font-size: 11.5px; color: var(--tinta); overflow-wrap: anywhere; }
+.tut-corpo pre { font-family: var(--font-dado); font-size: 11.5px; color: var(--tinta); background: var(--painel); border: 1px solid var(--linha); border-radius: 4px; padding: 6px 8px; margin: 6px 0; overflow-x: auto; }
+.tut-priv { border-top: 1px dashed var(--linha); padding-top: 6px; margin-top: 8px !important; }
+button.link { border: 0; background: none; padding: 0; color: var(--qrs); text-decoration: underline; font-weight: 500; font-size: inherit; }
 .nota-val { font-size: 12px; line-height: 1.45; color: var(--tinta-2); margin: 0; }
 .nota-val b { color: var(--tinta); font-weight: 500; }
 fieldset { border: 0; padding: 0; margin: 0; display: grid; gap: 8px; min-width: 0; }
@@ -136,16 +148,45 @@ a { color: var(--qrs); }
     <aside class="controles" aria-label="Controles">
       <fieldset>
         <legend>Arquivo</legend>
-        <label for="arquivos">WFDB (.hea + .dat) ou CSV
-          <input type="file" id="arquivos" multiple accept=".hea,.dat,.csv,.txt,.tsv">
+        <label for="arquivos">EDF, WFDB (.hea + .dat) ou CSV
+          <input type="file" id="arquivos" multiple accept=".edf,.bdf,.hea,.dat,.csv,.txt,.tsv">
         </label>
-        <p class="dica">No formato do PhysioNet, selecione os dois arquivos juntos (ex.: <code>sel30.hea</code> e <code>sel30.dat</code>). No CSV, uma coluna por derivação, em mV.</p>
         <div id="opcoes-csv" hidden>
           <div class="linha2">
             <label for="fs-csv">Amostragem (Hz)<input type="number" id="fs-csv" value="250" min="50" max="5000" step="1"></label>
-            <label class="check" style="align-self:end"><input type="checkbox" id="col-tempo"> 1ª coluna é tempo (s)</label>
+            <label for="un-csv">Unidade<select id="un-csv"><option value="mV" selected>mV</option><option value="uV">µV</option><option value="V">V</option></select></label>
           </div>
+          <label class="check" style="margin-top:6px"><input type="checkbox" id="col-tempo"> 1ª coluna é tempo (s): calcula a amostragem</label>
         </div>
+        <details class="tutorial">
+          <summary>Como preparar e enviar o arquivo</summary>
+          <div class="tut-corpo">
+            <h3>EDF ou BDF <span>um arquivo só</span></h3>
+            <p>Formato de exportação da maioria dos Holter e polígrafos. Exporte o exame como <code>.edf</code> no programa do aparelho e selecione esse arquivo. A página usa os canais de maior taxa de amostragem (o ECG) e ignora anotações e canais lentos, como a oximetria.</p>
+
+            <h3>PhysioNet (WFDB) <span>dois arquivos</span></h3>
+            <ol>
+              <li>Abra o banco no PhysioNet, por exemplo a <a href="https://physionet.org/content/sddb/1.0.0/" target="_blank" rel="noopener">SDDB</a> ou a <a href="https://physionet.org/content/qtdb/1.0.0/" target="_blank" rel="noopener">QTDB</a>.</li>
+              <li>Em <i>Files</i>, baixe os dois arquivos do registro: <code>30.hea</code> (cabeçalho) e <code>30.dat</code> (sinal).</li>
+              <li>Em “Escolher arquivos”, selecione os dois juntos: no computador, segure Ctrl (⌘ no Mac); no celular, toque e segure para marcar vários.</li>
+            </ol>
+            <p>Um Holter de 24 h abre inteiro, e a análise é feita em trechos de até 60 min (Início e Duração).</p>
+
+            <h3>CSV ou texto <span>planilha, Python, MATLAB</span></h3>
+            <p>Uma linha por amostra e uma coluna por derivação. A linha de nomes é opcional.</p>
+            <pre>tempo_s,D1_mV,D2_mV
+0.000,-0.052,0.021
+0.004,-0.047,0.026</pre>
+            <ul>
+              <li>Separador: vírgula, ponto e vírgula ou tabulação. Com ponto e vírgula, a vírgula decimal funciona (<code>-0,052</code>).</li>
+              <li>Depois de carregar, confira a amostragem e a unidade. Se a 1ª coluna for o tempo, marque a opção: a amostragem sai dela.</li>
+              <li>Linhas de texto antes dos números são ignoradas. Se nelas aparecer a amostragem (“Sample Rate, 512 Hz”) ou a unidade (µV), a página já preenche.</li>
+              <li>Python: <code>np.savetxt('ecg.csv', sinais, delimiter=',')</code>. MATLAB: <code>writematrix(sinais, 'ecg.csv')</code>. Em <code>sinais</code>, uma coluna por derivação.</li>
+            </ul>
+            <p><button type="button" class="link" id="baixar-csv">Baixar um CSV de exemplo</button> (10 s do sinal sintético, para ver o formato).</p>
+            <p class="tut-priv">O arquivo é lido no seu navegador e não é enviado a nenhum servidor.</p>
+          </div>
+        </details>
         <button type="button" id="btn-exemplo">Carregar o exemplo sintético</button>
       </fieldset>
 
@@ -734,17 +775,74 @@ self.onmessage = function (ev) {
     chs = chs.map(function (c) { return c.slice(0, n); });
     return { nome: cab.nome, fs: cab.fs, chs: chs, nomes: cab.sinais.map(function (s) { return s.nome; }), unid: cab.sinais.map(function (s) { return s.unid; }), n: n, origem: 'WFDB' };
   }
-  function lerCsv(txt, fs, colTempo) {
-    var linhas = txt.split(/\r?\n/).filter(function (l) { return l.trim(); });
-    var sep = /;/.test(linhas[0]) ? ';' : (/\t/.test(linhas[0]) ? '\t' : (/,/.test(linhas[0]) ? ',' : /\s+/));
-    var num = function (s) { s = s.trim(); if (sep === ';') s = s.replace(',', '.'); return parseFloat(s); };
-    var cab = linhas[0].split(sep), temCab = cab.some(function (c) { return isNaN(num(c)); });
-    var dados = (temCab ? linhas.slice(1) : linhas).map(function (l) { return l.split(sep).map(num); });
-    var nc = dados[0].length, c0 = colTempo ? 1 : 0;
+  // Lê a parte de texto antes dos números: amostragem ("Sample Rate,512 hertz", "fs = 250") e unidade (µV, mV, V).
+  function metadadosCsv(txt) {
+    var topo = txt.slice(0, 4000), r = {};
+    var mf = topo.match(/(sample\s*rate|sampling\s*(rate|frequency)|amostragem|frequ[eê]ncia|\bfs\b)[^\d\n]{0,20}(\d+(?:[.,]\d+)?)/i);
+    if (mf) r.fs = parseFloat(mf[3].replace(',', '.'));
+    if (/µv|μv|\buv\b|microvolt/i.test(topo)) r.unid = 'uV'; else if (/\bmv\b|milivolt|millivolt/i.test(topo)) r.unid = 'mV';
+    return r;
+  }
+  function lerCsv(txt, fs, colTempo, fator) {
+    fator = fator || 1;
+    var todas = txt.split(/\r?\n/).map(function (l) { return l.trim(); }).filter(Boolean);
+    var sepDe = function (l) { return /;/.test(l) ? ';' : (/\t/.test(l) ? '\t' : (/,/.test(l) ? ',' : /\s+/)); };
+    var numCom = function (sep) { return function (s) { s = s.trim().replace(/^"|"$/g, ''); if (sep === ';' || sep === '\t') s = s.replace(',', '.'); return s === '' ? NaN : Number(s); }; };
+    // primeira linha só com números = início dos dados; o que vem antes é cabeçalho ou metadados
+    var i0 = -1, sep, num;
+    for (var i = 0; i < Math.min(todas.length, 200); i++) {
+      var s = sepDe(todas[i]), nf = numCom(s), campos = todas[i].split(s);
+      if (campos.length && campos.every(function (c) { return isFinite(nf(c)); })) { i0 = i; sep = s; num = nf; break; }
+    }
+    if (i0 < 0) throw new Error('Não encontrei linhas só com números no arquivo.');
+    var nc = todas[i0].split(sep).length;
+    var cab = null;
+    if (i0 > 0) { var lc = todas[i0 - 1], sc = sepDe(lc), cc = lc.split(sc); if (cc.length === nc && cc.every(function (c) { return !isFinite(numCom(sc)(c)); })) cab = cc; }
+    var dados = []; for (i = i0; i < todas.length; i++) { var lin = todas[i].split(sep); if (lin.length === nc) dados.push(lin.map(num)); }
+    var c0 = colTempo ? 1 : 0;
     if (nc - c0 < 1) throw new Error('O CSV não tem colunas de sinal.');
-    if (colTempo) { var dt = []; for (var i = 1; i < Math.min(dados.length, 2000); i++) dt.push(dados[i][0] - dados[i - 1][0]); var m = mediana(dt); if (m > 0) fs = Math.round(1 / m); }
-    var chs = []; for (var c = c0; c < nc; c++) { var a = new Float64Array(dados.length); for (var t = 0; t < dados.length; t++) { var v = dados[t][c]; a[t] = isFinite(v) ? v : 0; } chs.push(a); }
-    return { nome: 'CSV', fs: fs, chs: chs, nomes: chs.map(function (_, k) { return temCab ? (cab[k + c0] || '').trim() || ('Coluna ' + (k + 1)) : ('Coluna ' + (k + 1)); }), unid: chs.map(function () { return 'mV'; }), n: dados.length, origem: 'CSV' };
+    if (colTempo) { var dt = []; for (i = 1; i < Math.min(dados.length, 2000); i++) dt.push(dados[i][0] - dados[i - 1][0]); var m = mediana(dt); if (m > 0) fs = Math.round(1 / m); }
+    var chs = []; for (var c = c0; c < nc; c++) { var a = new Float64Array(dados.length); for (var t = 0; t < dados.length; t++) { var v = dados[t][c] * fator; a[t] = isFinite(v) ? v : 0; } chs.push(a); }
+    return { nome: 'CSV', fs: fs, chs: chs, nomes: chs.map(function (_, k) { return cab ? (cab[k + c0] || '').trim().replace(/^"|"$/g, '') || ('Coluna ' + (k + 1)) : ('Coluna ' + (k + 1)); }), unid: chs.map(function () { return 'mV'; }), n: dados.length, origem: 'CSV' };
+  }
+  // EDF, EDF+ (16 bits) e BDF (24 bits). Usa os canais com a maior taxa de amostragem e ignora anotações.
+  function lerEdf(buf, nome) {
+    var u8 = new Uint8Array(buf), txt = function (a, n) { return String.fromCharCode.apply(null, u8.subarray(a, a + n)).trim(); };
+    if (buf.byteLength < 256) throw new Error('O arquivo é pequeno demais para ser EDF.');
+    var bdf = u8[0] === 255, nb = bdf ? 3 : 2;
+    var hdr = parseInt(txt(184, 8), 10), nrec = parseInt(txt(236, 8), 10), drec = parseFloat(txt(244, 8)), ns = parseInt(txt(252, 4), 10);
+    if (!(ns > 0) || !(hdr >= 256 * (ns + 1))) throw new Error('Cabeçalho EDF inválido.');
+    var campo = function (off, larg, k) { return txt(256 + off * ns + larg * k, larg); };
+    var off = { rot: 0, trans: 16, dim: 96, pmin: 104, pmax: 112, dmin: 120, dmax: 128, filt: 136, nspr: 216 }, larg = { rot: 16, trans: 80, dim: 8, pmin: 8, pmax: 8, dmin: 8, dmax: 8, filt: 80, nspr: 8 };
+    var sig = [], porRec = 0;
+    for (var k = 0; k < ns; k++) {
+      var g = {}; for (var f in off) g[f] = campo(off[f], larg[f], k);
+      g.n = parseInt(g.nspr, 10); g.ini = porRec; porRec += g.n;
+      g.fs = drec > 0 ? g.n / drec : g.n; sig.push(g);
+    }
+    var tamRec = porRec * nb; if (!(nrec > 0)) nrec = Math.floor((buf.byteLength - hdr) / tamRec);
+    nrec = Math.min(nrec, Math.floor((buf.byteLength - hdr) / tamRec));
+    var uteis = sig.filter(function (g) { return !/annotation/i.test(g.rot) && g.n > 0; });
+    if (!uteis.length) throw new Error('O EDF não tem canais de sinal.');
+    var fsMax = Math.max.apply(null, uteis.map(function (g) { return g.fs; }));
+    uteis = uteis.filter(function (g) { return g.fs === fsMax; });
+    var chs = uteis.map(function (g) {
+      var pmin = parseFloat(g.pmin), pmax = parseFloat(g.pmax), dmin = parseFloat(g.dmin), dmax = parseFloat(g.dmax);
+      var esc = (pmax - pmin) / (dmax - dmin || 1), dim = g.dim.toLowerCase();
+      var mult = /^(u|µ|μ)v/.test(dim) ? 0.001 : (/^mv/.test(dim) ? 1 : (/^v/.test(dim) ? 1000 : (/^nv/.test(dim) ? 1e-6 : 1)));
+      var a = new Float64Array(nrec * g.n), p = 0;
+      for (var r = 0; r < nrec; r++) {
+        var base = hdr + (r * porRec + g.ini) * nb;
+        for (var j = 0; j < g.n; j++) {
+          var q = base + j * nb, d;
+          if (bdf) { d = u8[q] | (u8[q + 1] << 8) | (u8[q + 2] << 16); if (d & 0x800000) d -= 0x1000000; }
+          else { d = u8[q] | (u8[q + 1] << 8); if (d & 0x8000) d -= 0x10000; }
+          a[p++] = ((d - dmin) * esc + pmin) * mult;
+        }
+      }
+      return a;
+    });
+    return { nome: nome.replace(/\.(edf|bdf)$/i, ''), fs: fsMax, chs: chs, nomes: uteis.map(function (g) { return g.rot || 'Canal'; }), unid: uteis.map(function () { return 'mV'; }), n: chs[0].length, origem: bdf ? 'BDF' : 'EDF' };
   }
 
   // ---------- exemplo sintético ----------
@@ -791,20 +889,46 @@ self.onmessage = function (ev) {
     var fs = Array.prototype.slice.call(ev.target.files || []);
     if (!fs.length) return;
     var hea = fs.filter(function (f) { return /\.hea$/i.test(f.name); })[0], csv = fs.filter(function (f) { return /\.(csv|txt|tsv)$/i.test(f.name); })[0];
-    $('opcoes-csv').hidden = !csv || !!hea;
+    var edf = fs.filter(function (f) { return /\.(edf|bdf)$/i.test(f.name); })[0];
+    $('opcoes-csv').hidden = !csv || !!hea || !!edf;
     estado('Lendo…');
-    if (hea) {
+    if (edf) {
+      edf.arrayBuffer().then(function (b) { usarRegistro(lerEdf(b, edf.name)); analisar(); })
+        .catch(function (e) { estado('Não consegui ler o EDF: ' + e.message, true); });
+    } else if (hea) {
       Promise.all([hea.text()].concat(fs.filter(function (f) { return /\.dat$/i.test(f.name); }).map(function (f) { return f.arrayBuffer().then(function (b) { return [f.name.toLowerCase(), b]; }); })))
         .then(function (r) { var cab = lerHea(r[0]), bufs = {}; r.slice(1).forEach(function (p) { bufs[p[0]] = p[1]; }); usarRegistro(lerDat(cab, bufs)); analisar(); })
         .catch(function (e) { estado(e.message, true); });
     } else if (csv) {
-      csv.text().then(function (t) { ULTIMO_CSV = t; usarRegistro(lerCsv(t, parseFloat($('fs-csv').value) || 250, $('col-tempo').checked)); analisar(); })
-        .catch(function (e) { estado('Não consegui ler o CSV: ' + e.message, true); });
-    } else estado('Selecione um .hea com o .dat, ou um .csv.', true);
+      csv.text().then(function (t) {
+        ULTIMO_CSV = t; var md = metadadosCsv(t);
+        if (md.fs >= 50 && md.fs <= 5000) $('fs-csv').value = md.fs;
+        if (md.unid) $('un-csv').value = md.unid;
+        usarRegistro(lerCsvAtual(t)); analisar();
+      }).catch(function (e) { estado('Não consegui ler o CSV: ' + e.message, true); });
+    } else estado('Selecione um .edf, um .hea com o .dat, ou um .csv.', true);
   });
-  function relerCsv() { if (!ULTIMO_CSV || !REC || REC.origem !== 'CSV') return; try { usarRegistro(lerCsv(ULTIMO_CSV, parseFloat($('fs-csv').value) || 250, $('col-tempo').checked)); analisar(); } catch (e) { estado(e.message, true); } }
+  var FATOR_UN = { mV: 1, uV: 0.001, V: 1000 };
+  function lerCsvAtual(t) {
+    var r = lerCsv(t, parseFloat($('fs-csv').value) || 250, $('col-tempo').checked, FATOR_UN[$('un-csv').value]);
+    if ($('col-tempo').checked) $('fs-csv').value = r.fs;
+    return r;
+  }
+  function relerCsv() { if (!ULTIMO_CSV || !REC || REC.origem !== 'CSV') return; try { usarRegistro(lerCsvAtual(ULTIMO_CSV)); analisar(); } catch (e) { estado(e.message, true); } }
   $('fs-csv').addEventListener('change', relerCsv);
   $('col-tempo').addEventListener('change', relerCsv);
+  $('un-csv').addEventListener('change', relerCsv);
+  $('baixar-csv').addEventListener('click', function () {
+    var r = exemplo(), n = Math.min(r.n, 10 * r.fs), l = ['tempo_s,D1_mV,D2_mV'];
+    for (var i = 0; i < n; i++) l.push((i / r.fs).toFixed(3) + ',' + r.chs[0][i].toFixed(4) + ',' + r.chs[1][i].toFixed(4));
+    var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([l.join('\n') + '\n'], { type: 'text/csv' }));
+    a.download = 'ecg_exemplo.csv'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+  });
+  // "?" no celular: um toque abre, outro toque fecha
+  Array.prototype.forEach.call(document.querySelectorAll('.ajuda-btn'), function (b) {
+    b.addEventListener('pointerdown', function () { b._aberto = document.activeElement === b; });
+    b.addEventListener('click', function () { if (b._aberto) b.blur(); });
+  });
   $('btn-exemplo').addEventListener('click', function () { usarRegistro(exemplo()); analisar(); });
 
   // ---------- análise (Web Worker) ----------
