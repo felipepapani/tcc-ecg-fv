@@ -57,9 +57,20 @@ aside.controles { background: var(--painel); border: 1px solid var(--linha); bor
   padding: 9px 11px; border-radius: 5px; box-shadow: 0 6px 18px rgb(0 0 0 / 0.22); opacity: 0; visibility: hidden; transition: opacity 0.12s, visibility 0.12s; pointer-events: none; }
 .tt-cima { top: auto; bottom: calc(100% + 2px); }
 .ajuda:hover .tt, .ajuda:focus-within .tt { opacity: 1; visibility: visible; }
-.efeito { font-size: 12.5px; line-height: 1.45; color: var(--tinta-2); margin: 0; }
-.efeito b { color: var(--tinta); font-weight: 600; font-variant-numeric: tabular-nums; }
-.efeito .nt { display: inline-block; font-family: var(--font-dado); font-size: 11px; color: var(--acento); border: 1px solid currentColor; border-radius: 3px; padding: 0 4px; margin-right: 4px; }
+.param-nome { font-size: 13.5px; font-weight: 500; }
+.seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; border: 1px solid var(--linha); border-radius: 5px; overflow: hidden; background: var(--papel); }
+.seg label { position: relative; display: grid; gap: 1px; justify-items: center; text-align: center; padding: 6px 4px 5px; cursor: pointer; border-left: 1px solid var(--linha); }
+.seg label:first-child { border-left: 0; }
+.seg input { position: absolute; inset: 0; opacity: 0; margin: 0; cursor: pointer; }
+.seg .v { font-family: var(--font-dado); font-size: 13px; font-weight: 500; }
+.seg .m { font-family: var(--font-dado); font-size: 11.5px; color: var(--tinta-2); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.seg .m.sem { opacity: 0.6; }
+.seg .melhor { font-style: normal; color: var(--ok); }
+.seg label:hover { background: color-mix(in srgb, var(--qrs) 7%, transparent); }
+.seg label:has(input:checked) { background: color-mix(in srgb, var(--qrs) 16%, transparent); box-shadow: inset 0 -2px 0 var(--qrs); }
+.seg label:has(input:checked) .m { color: var(--tinta); }
+.seg label:has(input:focus-visible) { outline: 2px solid var(--qrs); outline-offset: -2px; }
+.seg-leg { font-size: 11.5px; line-height: 1.35; color: var(--tinta-2); margin: 0; }
 .nota-val { font-size: 12px; line-height: 1.45; color: var(--tinta-2); margin: 0; }
 .nota-val b { color: var(--tinta); font-weight: 500; }
 fieldset { border: 0; padding: 0; margin: 0; display: grid; gap: 8px; min-width: 0; }
@@ -156,44 +167,59 @@ a { color: var(--qrs); }
 
         <div class="param">
           <div class="param-cab">
-            <label for="p-q">Percentil da matriz</label>
+            <span class="param-nome" id="l-q">Percentil da matriz</span>
             <span class="ajuda"><button type="button" class="ajuda-btn" aria-label="O que faz o percentil da matriz" aria-describedby="tt-q">?</button>
-              <span class="tt" role="tooltip" id="tt-q">Decide o que conta como “distante”. Em cada janela de 4 s, um par de instantes fica branco na matriz binarizada se a distância entre eles passa desse percentil de todas as distâncias da janela. Quanto maior o percentil, menos pares ficam brancos: só as distâncias maiores, as do QRS.</span></span>
+              <span class="tt" role="tooltip" id="tt-q">Decide o que conta como “distante”: um par de instantes fica branco na matriz binarizada se a distância entre eles passa desse percentil das distâncias da janela de 4 s. Quanto mais alto, menos pares ficam brancos, só os do QRS. Com 90 %, ondas T altas e ruído tendem a entrar; com 98 %, batimentos pequenos tendem a sumir. Só 95 %, o valor do método original, foi testado no TCC.</span></span>
           </div>
-          <select id="p-q"><option value="0.90">90 %</option><option value="0.95" selected>95 % · padrão do método</option><option value="0.98">98 %</option></select>
-          <p class="efeito" data-efeito="p-q" aria-live="polite"></p>
+          <div class="seg" role="radiogroup" aria-labelledby="l-q">
+            <label><input type="radio" name="p-q" value="0.90"><span class="v">90 %</span><span class="m sem">—</span></label>
+            <label><input type="radio" name="p-q" value="0.95" checked><span class="v">95 %</span><span class="m">testado</span></label>
+            <label><input type="radio" name="p-q" value="0.98"><span class="v">98 %</span><span class="m sem">—</span></label>
+          </div>
+          <p class="seg-leg">Só 95 % foi avaliado no TCC</p>
         </div>
 
         <div class="param">
           <div class="param-cab">
-            <label for="p-frac">Limiar da soma</label>
+            <span class="param-nome" id="l-frac">Limiar da soma</span>
             <span class="ajuda"><button type="button" class="ajuda-btn" aria-label="O que faz o limiar da soma" aria-describedby="tt-frac">?</button>
-              <span class="tt" role="tooltip" id="tt-frac">Para cada instante, a página conta quantos outros instantes da janela estão distantes dele (a curva embaixo da matriz). Onde essa contagem passa da porcentagem escolhida do maior valor da janela, há um QRS. Como a régua é o máximo da janela, uma extrassístole grande sobe o limiar e pode esconder os batimentos normais vizinhos.</span></span>
+              <span class="tt" role="tooltip" id="tt-frac">Para cada instante, conta quantos outros instantes da janela estão distantes dele (a curva embaixo da matriz). Onde a contagem passa dessa porcentagem do maior valor da janela, há um QRS. Como a régua é o máximo da janela, uma extrassístole grande sobe o limiar e esconde os batimentos normais vizinhos.<br><br>No TCC, com 75 %: encontrou 83,9 % e 78,7 % dos batimentos, com 99,6 % e 99,3 % de marcas corretas. Com 50 % (e refino ligado): 94,0 % e 87,6 %, com 99,5 % e 99,0 %. Em 55 % dos batimentos perdidos com 75 %, havia uma extrassístole na janela.</span></span>
           </div>
-          <select id="p-frac"><option value="0.75" selected>75 % · padrão do método</option><option value="0.5">50 % · mais sensível</option></select>
-          <p class="efeito" data-efeito="p-frac" aria-live="polite"></p>
+          <div class="seg" role="radiogroup" aria-labelledby="l-frac">
+            <label><input type="radio" name="p-frac" value="0.75" checked><span class="v">75 %</span><span class="m">91,1 | 87,8</span></label>
+            <label><input type="radio" name="p-frac" value="0.5"><span class="v">50 %</span><span class="m">96,7 | 93,0 <i class="melhor" title="melhor no TCC">★</i></span></label>
+          </div>
+          <p class="seg-leg">F1 (%) fora | na última hora · maior é melhor</p>
         </div>
 
         <div class="param">
           <div class="param-cab">
-            <label for="p-alfa">Faixa da onda T</label>
+            <span class="param-nome" id="l-alfa">Faixa da onda T</span>
             <span class="ajuda"><button type="button" class="ajuda-btn" aria-label="O que faz a faixa da onda T" aria-describedby="tt-alfa">?</button>
-              <span class="tt" role="tooltip" id="tt-alfa">Muda só as linhas tracejadas do traçado. A marcação principal da onda T (área laranja) vem do método do trapézio e não depende deste ajuste. As linhas tracejadas são uma borda alternativa: o ponto em que a curva de distância, descendo do pico da T, cruza essa porcentagem da altura da onda.</span></span>
+              <span class="tt" role="tooltip" id="tt-alfa">Muda só as linhas tracejadas do traçado. A marcação principal da onda T (área laranja) vem do método do trapézio e não depende deste ajuste. As linhas tracejadas marcam onde a curva de distância, descendo do pico da T, cruza essa porcentagem da altura da onda.<br><br>No TCC (20 %, 18 registros da QTDB não usados no ajuste), o fim da T saiu em 74,8 % dos batimentos, com desvio-padrão de 108 ms. O trapézio marcou 91,7 %, com 81 ms. 10 % e 30 % não foram testados.</span></span>
           </div>
-          <select id="p-alfa"><option value="0.1">10 %</option><option value="0.2" selected>20 % · avaliado no TCC</option><option value="0.3">30 %</option></select>
-          <p class="efeito" data-efeito="p-alfa" aria-live="polite"></p>
+          <div class="seg" role="radiogroup" aria-labelledby="l-alfa">
+            <label><input type="radio" name="p-alfa" value="0.1"><span class="v">10 %</span><span class="m sem">—</span></label>
+            <label><input type="radio" name="p-alfa" value="0.2" checked><span class="v">20 %</span><span class="m">108 ms</span></label>
+            <label><input type="radio" name="p-alfa" value="0.3"><span class="v">30 %</span><span class="m sem">—</span></label>
+          </div>
+          <p class="seg-leg">Erro no fim da T (DP) · menor é melhor · trapézio: 81 ms</p>
         </div>
 
         <div class="param">
           <div class="param-cab">
-            <label class="check" for="p-refino"><input type="checkbox" id="p-refino" checked> Refinar pico R</label>
-            <span class="ajuda"><button type="button" class="ajuda-btn" aria-label="O que faz o refino do pico R" aria-describedby="tt-refino">?</button>
-              <span class="tt tt-cima" role="tooltip" id="tt-refino">O detector marca o meio do grupo de colunas do QRS (o centroide), que nem sempre cai no pico R. Com o refino ligado, cada marca vai para o ponto de maior amplitude do sinal filtrado a até ±60 ms. É a partir dessa marca que a página procura as bordas do QRS e da onda T.</span></span>
+            <span class="param-nome" id="l-refino">Marca do QRS</span>
+            <span class="ajuda"><button type="button" class="ajuda-btn" aria-label="O que faz a escolha da marca do QRS" aria-describedby="tt-refino">?</button>
+              <span class="tt tt-cima" role="tooltip" id="tt-refino">O detector marca o meio do grupo de colunas do QRS (o centroide), que nem sempre cai no pico R. Com “Pico R”, cada marca vai para o ponto de maior amplitude do sinal filtrado a até ±60 ms. É a partir dessa marca que a página procura as bordas do QRS e da onda T.<br><br>Não muda quantos batimentos são achados (F1 de 91,1 % nos dois casos), só onde a marca cai.</span></span>
           </div>
-          <p class="efeito" data-efeito="p-refino" aria-live="polite"></p>
+          <div class="seg" role="radiogroup" aria-labelledby="l-refino">
+            <label><input type="radio" name="p-refino" value="0"><span class="v">Centroide</span><span class="m">5,9 % <i class="melhor" title="melhor no TCC">★</i></span></label>
+            <label><input type="radio" name="p-refino" value="1" checked><span class="v">Pico R</span><span class="m">9,7 %</span></label>
+          </div>
+          <p class="seg-leg">RR com erro acima de 20 ms · menor é melhor</p>
         </div>
 
-        <p class="nota-val">Os números vêm da validação do TCC em 7 Holter anotados da SDDB. Uma marca conta como acerto se cai a até ±150 ms da anotação do especialista. <b>Encontrou</b> é a sensibilidade, <b>marcas corretas</b> é o valor preditivo positivo e o <b>F1</b> combina os dois. Para comparar, o detector xqrs (WFDB) teve F1 de 99,5 % e 99,1 %, e o TCC exigia 99 %.</p>
+        <p class="nota-val">★ = melhor resultado no TCC (7 Holter anotados da SDDB; acerto = marca a até ±150 ms da anotação). Para comparar, o detector xqrs teve F1 de 99,5 | 99,1, e o critério era 99.</p>
       </fieldset>
 
       <button type="button" class="primario" id="btn-analisar">Analisar</button>
@@ -796,7 +822,8 @@ self.onmessage = function (ev) {
     if (fim - ini < 10 * fs) { estado('O trecho precisa ter pelo menos 10 s.', true); return; }
     var pad = Math.round(2 * fs), s0 = Math.max(0, ini - pad), s1 = Math.min(REC.n, fim + pad);
     var chs = canais.map(function (k) { return REC.chs[k].slice(s0, s1); });
-    var opt = { q: parseFloat($('p-q').value), frac: parseFloat($('p-frac').value), refinar: $('p-refino').checked, alfa: parseFloat($('p-alfa').value) };
+    var marcado = function (n) { return document.querySelector('input[name="' + n + '"]:checked').value; };
+    var opt = { q: parseFloat(marcado('p-q')), frac: parseFloat(marcado('p-frac')), refinar: marcado('p-refino') === '1', alfa: parseFloat(marcado('p-alfa')) };
     if (worker) worker.terminate();
     worker = criarWorker();
     $('btn-analisar').disabled = true; $('progresso').style.width = '0%';
@@ -1011,38 +1038,7 @@ self.onmessage = function (ev) {
   window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', desenharTudo);
   new MutationObserver(desenharTudo).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
 
-  // ---------- o que cada escolha muda (números da validação do TCC; ver resultados/csv) ----------
-  var NT = '<span class="nt">não testado no TCC</span>';
-  var EFEITOS = {
-    'p-q': {
-      '0.9': NT + 'Mais pares ficam brancos. Entram QRS de amplitude menor, mas ondas T altas e ruído também podem virar QRS.',
-      '0.95': 'Valor do método original e o único avaliado no TCC. O desempenho aparece no limiar da soma, logo abaixo.',
-      '0.98': NT + 'Só as distâncias extremas ficam brancas. Tende a dar menos falsos QRS e a perder batimentos menores.'
-    },
-    'p-frac': {
-      '0.75': 'Encontrou <b>83,9 %</b> dos batimentos fora da última hora e <b>78,7 %</b> na última hora antes da FV, com <b>99,6 %</b> e <b>99,3 %</b> de marcas corretas (F1 de <b>91,1 %</b> e <b>87,8 %</b>). O erro é de omissão: em 55 % dos batimentos perdidos, o máximo da janela era uma extrassístole.',
-      '0.5': 'Encontrou <b>94,0 %</b> e <b>87,6 %</b> dos batimentos, com <b>99,5 %</b> e <b>99,0 %</b> de marcas corretas (F1 de <b>96,7 %</b> e <b>93,0 %</b>). Foi a melhor variante do TCC, testada com o refino ligado. Em troca, <b>10,0 %</b> dos intervalos RR erram por mais de 20 ms (9,7 % com 75 %).'
-    },
-    'p-alfa': {
-      '0.1': NT + 'Corta mais perto da base: bordas mais largas e mais sensíveis a ruído e a desvios da linha de base.',
-      '0.2': 'Em 18 registros da QTDB não usados no ajuste, o fim da T por esta faixa saiu em <b>74,8 %</b> dos batimentos, com desvio-padrão de <b>108 ms</b> e erro mediano de <b>40 ms</b>. O trapézio foi melhor (<b>91,7 %</b>, <b>81 ms</b> e <b>32 ms</b>), e por isso é a marcação principal.',
-      '0.3': NT + 'Corta mais alto na onda: bordas mais estreitas, com início atrasado e fim adiantado em relação à base da T.'
-    },
-    'p-refino': {
-      'true': 'Não muda quantos batimentos são achados (F1 de 91,1 % com e sem refino), só onde a marca cai. No TCC, os intervalos RR com erro acima de 20 ms subiram de 5,9 % para <b>9,7 %</b>.',
-      'false': 'A marca fica no centroide, o meio do QRS. No TCC, foi a opção com menor erro no RR: <b>5,9 %</b> dos intervalos erram por mais de 20 ms, e o percentil 95 do erro é de <b>24 ms</b>.'
-    }
-  };
-  function atualizarEfeitos() {
-    Array.prototype.forEach.call(document.querySelectorAll('[data-efeito]'), function (p) {
-      var el = $(p.getAttribute('data-efeito'));
-      var v = el.type === 'checkbox' ? String(el.checked) : String(parseFloat(el.value));
-      p.innerHTML = (EFEITOS[el.id] || {})[v] || '';
-    });
-  }
-  ['p-q', 'p-frac', 'p-alfa', 'p-refino'].forEach(function (id) { $(id).addEventListener('change', atualizarEfeitos); });
   document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && document.activeElement && document.activeElement.classList.contains('ajuda-btn')) document.activeElement.blur(); });
-  atualizarEfeitos();
 
   if (window.innerWidth < 600) { VIS.larg = 3; $('zoom').value = '3'; }
   usarRegistro(exemplo()); analisar();
