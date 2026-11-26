@@ -1,11 +1,11 @@
 // Testa os leitores de arquivo da página (docs/index.html) contra os casos de gerar_casos.py.
-// Uso:  python testes/gerar_casos.py && node testes/testar_leitores.mjs
+// Uso:  python testes/gerar_casos.py && node testes/testar_leitores.mjs [pasta com casos.json]
 import { readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const aqui = dirname(fileURLToPath(import.meta.url));
-const saida = join(aqui, 'saida');
+const saida = process.argv[2] ? resolve(process.argv[2]) : join(aqui, 'saida');
 const html = readFileSync(join(aqui, '..', 'docs', 'index.html'), 'utf8');
 
 // Extrai a seção de leitura de arquivos do script da página, sem copiar código.

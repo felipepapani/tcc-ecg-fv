@@ -68,6 +68,10 @@ python testes/gerar_casos.py
 node testes/testar_leitores.mjs     # Node 18 ou mais novo
 ```
 
+Com registros reais do PhysioNet, a leitura também coincidiu amostra a amostra com a das bibliotecas: `sel30` da QTDB
+(WFDB formato 212, 2 derivações, 15 min) e `r01.edf` da ADFECGDB (EDF+, 5 canais a 1000 Hz, com anotações). Para repetir
+com outros arquivos, gere um `casos.json` no mesmo formato e rode `node testes/testar_leitores.mjs <pasta>`.
+
 ## Dados
 
 Os sinais **não são redistribuídos**. Os cadernos baixam do PhysioNet:
