@@ -340,7 +340,7 @@ a { color: var(--qrs); }
       </div>
 
       <footer>
-        <p><b>Detecção do QRS:</b> método de Nicole Charron (TCC, Engenharia Biomédica, UFPE), usado com autorização: matriz de distância do ECG, binarização no percentil 95 %, soma das colunas, limiar de 75 % do máximo e agrupamento DBSCAN. Código original em <a href="https://github.com/Ni-cole17/PTB-Diagnostic-Visualization" target="_blank" rel="noopener">github.com/Ni-cole17/PTB-Diagnostic-Visualization</a>.</p>
+        <p><b>Detecção do QRS:</b> método de Nicole Charron (TCC, Engenharia Biomédica, UFPE), usado com autorização: matriz de distância do ECG, binarização no percentil 95 %, soma das colunas, limiar de 75 % do máximo e agrupamento DBSCAN. Código original em <a href="https://github.com/Ni-cole17/PTB-Diagnostic-Visualization" target="_blank" rel="noopener">github.com/Ni-cole17/PTB-Diagnostic-Visualization</a>. Em arquivos acima de 500 Hz, a matriz usa o sinal filtrado reduzido para 250–500 Hz (a taxa da validação do TCC é 250 Hz); o pico R e a delineação continuam na taxa original. Num ECG adulto a 1000 Hz, os batimentos encontrados foram os mesmos, com a análise 16 vezes mais rápida.</p>
         <p><b>Bordas do QRS e da onda T:</b> Felipe G. Papani (TCC, UFPE). Cada amostra é medida pela distância à linha isoelétrica do batimento (uma coluna da matriz de distância), e as bordas saem pelo método do trapézio (Vázquez-Seisdedos et al., 2011) ou pela largura da faixa. Mesma implementação do código do TCC em Python, conferida amostra a amostra.</p>
         <p><b>Como citar:</b> PAPANI, F. G. <i>Matriz de distância do eletrocardiograma na delineação de batimentos e na análise do segmento ST antes da fibrilação ventricular</i>. 2026. Trabalho de Conclusão de Curso (Bacharelado em Engenharia Biomédica) – Universidade Federal de Pernambuco, Recife, 2026. Código e resultados em <a href="https://github.com/felipepapani/tcc-ecg-fv" target="_blank" rel="noopener">github.com/felipepapani/tcc-ecg-fv</a> (licença MIT).</p>
         <p><b>Medidas:</b> QRS = início ao ponto J; QT = início do QRS ao fim da T; ST = ponto J ao início da T; ST60 = nível 60 ms após o ponto J menos o nível isoelétrico (derivação 1). FC, SDNN e RMSSD usam só intervalos entre 300 e 2000 ms que passam no filtro de ectópicos de 20 %. Ferramenta de pesquisa: não use para diagnóstico.</p>
@@ -581,18 +581,27 @@ var ALG = (function () {
     out.sort(function (x, y) { return x - y; });
     return out.filter(function (v, k) { return k === 0 || v !== out[k - 1]; });
   }
+  // Acima de 500 Hz, a matriz é calculada no sinal filtrado (1–50 Hz) tomado de q em q amostras, com fs/q entre 250 e 500 Hz.
+  // O filtro já removeu o que passa de 50 Hz, abaixo da metade da nova taxa, então nada se distorce. A 250 Hz ou menos, q = 1.
+  function fatorDeteccao(fs) { return fs > 500 ? Math.floor(fs / 250) : 1; }
+  function decimar(chs, q) {
+    if (q <= 1) return chs;
+    return chs.map(function (c) { var n = Math.ceil(c.length / q), o = new Float64Array(n); for (var i = 0; i < n; i++) o[i] = c[i * q]; return o; });
+  }
   function detectarQRS(chs, fs, opt) {
     opt = Object.assign({ q: 0.95, frac: 0.75, eps_s: 0.100, min_s: 0.002, win_s: 4.0, passo_s: 3.0, refinar: true, ini: 0, fim: null, progresso: null }, opt || {});
     var n = chs[0].length, ini = opt.ini, fim = opt.fim == null ? n : Math.min(trunc(opt.fim), n);
     var pad = trunc(2 * fs), a0 = Math.max(0, ini - pad), b0 = Math.min(n, fim + pad);
     var filt = filtroPassaBanda(chs.map(function (c) { return c.slice(a0, b0); }), fs);
-    var W = trunc(pyRound(opt.win_s * fs)), P = trunc(pyRound(opt.passo_s * fs)), borda = Math.floor((W - P) / 2);
-    var marcas = [], s0 = ini - a0, sFim = Math.max(ini - a0 + 1, fim - a0 - W + 1), total = Math.ceil((sFim - s0) / P), k = 0;
+    var qd = fatorDeteccao(fs), fsD = fs / qd, filtD = decimar(filt, qd);
+    var I0 = Math.round((ini - a0) / qd), F0 = Math.floor((fim - a0) / qd);   // trecho pedido, em amostras da detecção
+    var W = trunc(pyRound(opt.win_s * fsD)), P = trunc(pyRound(opt.passo_s * fsD)), borda = Math.floor((W - P) / 2);
+    var marcas = [], s0 = I0, sFim = Math.max(I0 + 1, F0 - W + 1), total = Math.ceil((sFim - s0) / P), k = 0;
     for (var s = s0; s < sFim; s += P, k++) {
-      var Wt = Math.min(W, filt[0].length - s);
+      var Wt = Math.min(W, filtD[0].length - s);
       if (Wt < Math.floor(W / 2)) break;
-      var r = qrsJanela(filt, s, Wt, fs, opt);
-      var lo = (s === ini - a0) ? 0 : borda, hi = (s + W >= fim - a0) ? Wt : W - borda;
+      var r = qrsJanela(filtD, s, Wt, fsD, opt);
+      var lo = (s === I0) ? 0 : borda, hi = (s + W >= F0) ? Wt : W - borda;
       r.cent.forEach(function (c) { if (c >= lo && c < hi) marcas.push(s + c); });
       if (opt.progresso && k % 50 === 0) opt.progresso(k / total);
     }
@@ -601,14 +610,16 @@ var ALG = (function () {
     if (marcas.length) {
       var g = [marcas[0]];
       for (var i = 1; i < marcas.length; i++) {
-        if (marcas[i] - marcas[i - 1] > 0.150 * fs) { fund.push(g.reduce(function (x, y) { return x + y; }, 0) / g.length); g = []; }
+        if (marcas[i] - marcas[i - 1] > 0.150 * fsD) { fund.push(g.reduce(function (x, y) { return x + y; }, 0) / g.length); g = []; }
         g.push(marcas[i]);
       }
       fund.push(g.reduce(function (x, y) { return x + y; }, 0) / g.length);
     }
+    fund = fund.map(function (v) { return v * qd; });                       // de volta às amostras do arquivo
     var cent = fund.map(function (v) { return pyRound(v + a0); });
+    // o refino para o pico usa o sinal filtrado na taxa original: a marca final tem a resolução do arquivo
     var pico = opt.refinar && fund.length ? refinarPico(filt, fund.map(pyRound), fs).map(function (v) { return v + a0; }) : null;
-    return { centroide: cent, pico: pico };
+    return { centroide: cent, pico: pico, fsDeteccao: fsD };
   }
 
   // ---------- delineação (seção 9) ----------
@@ -689,6 +700,7 @@ var ALG = (function () {
   return { pyRound: pyRound, butter: butter, filtfilt: filtfilt, filtroPassaBanda: filtroPassaBanda,
            prepararParaDelinear: prepararParaDelinear, matrizDistancia: matrizDistancia, quantil: quantil,
            qrsJanela: qrsJanela, detectarQRS: detectarQRS, refinarPico: refinarPico, delinear: delinear,
+           fatorDeteccao: fatorDeteccao, decimar: decimar,
            pontoIsoeletrico: pontoIsoeletrico, serieRR: serieRR, medianFilterNearest: medianFilterNearest,
            maxFilter1d: maxFilter1d, uniformFilter1d: uniformFilter1d };
 })();
@@ -1152,11 +1164,15 @@ self.onmessage = function (ev) {
     var cv = $('tela-mat'), cs = $('tela-soma');
     var Ts = prepararTela(cs);
     if (!RES) { prepararTela(cv); return; }
-    var fs = RES.fs, Wmax = 1200, W = Math.min(Math.round(4 * fs), Wmax), dur = W / fs;
-    var s = Math.max(0, Math.round(VIS.t0 * fs) - RES.s0); if (s + W > RES.filt[0].length) s = Math.max(0, RES.filt[0].length - W);
-    W = Math.min(W, RES.filt[0].length - s);
-    var r = ALG.qrsJanela(RES.filt, s, W, fs, { q: RES.opt.q, frac: RES.opt.frac, eps_s: 0.1, min_s: 0.002 }, true);
-    $('info-mat').textContent = 'Janela de ' + fmt(dur, 1) + ' s a partir de ' + fmt((s + RES.s0) / fs, 1) + ' s, sinal filtrado 1–50 Hz. Percentil ' + fmt(100 * RES.opt.q, 0) + ' % = ' + fmt(r.limD, 2) + ' mV.';
+    // a mesma taxa da detecção (acima de 500 Hz, o sinal filtrado de q em q amostras)
+    var qd = ALG.fatorDeteccao(RES.fs), fs = RES.fs / qd;
+    if (!RES.filtDet) RES.filtDet = ALG.decimar(RES.filt, qd);
+    var F = RES.filtDet, Wmax = 1200, W = Math.min(Math.round(4 * fs), Wmax);
+    var s = Math.max(0, Math.round((Math.round(VIS.t0 * RES.fs) - RES.s0) / qd)); if (s + W > F[0].length) s = Math.max(0, F[0].length - W);
+    W = Math.min(W, F[0].length - s);
+    var dur = W / fs;
+    var r = ALG.qrsJanela(F, s, W, fs, { q: RES.opt.q, frac: RES.opt.frac, eps_s: 0.1, min_s: 0.002 }, true);
+    $('info-mat').textContent = 'Janela de ' + fmt(dur, 1) + ' s a partir de ' + fmt((s * qd + RES.s0) / RES.fs, 1) + ' s, sinal filtrado 1–50 Hz' + (qd > 1 ? ', a ' + fmt(fs, 0) + ' Hz como na detecção' : '') + '. Percentil ' + fmt(100 * RES.opt.q, 0) + ' % = ' + fmt(r.limD, 2) + ' mV.';
     var lado = Math.min(cv.parentElement.clientWidth - 28, 440);
     cv.style.width = lado + 'px'; cv.style.height = lado + 'px';
     var dpr = window.devicePixelRatio || 1, px = Math.round(lado * dpr);
