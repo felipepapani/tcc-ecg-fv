@@ -10,3 +10,6 @@ QTDB/
 *.hea
 *.atr
 tcc_final/
+
+# arquivos gerados pelos testes
+testes/saida/

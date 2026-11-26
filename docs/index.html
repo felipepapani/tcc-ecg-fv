@@ -3,7 +3,15 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="description" content="Detecção de QRS e delineação de batimentos de ECG pela matriz de distância, executada no navegador.">
+<meta name="description" content="Detecção de QRS e delineação de batimentos de ECG pela matriz de distância, executada no navegador. TCC de Felipe Garcia Papani, Engenharia Biomédica, UFPE, 2026.">
+<meta name="author" content="Felipe Garcia Papani">
+<meta property="og:type" content="website">
+<meta property="og:locale" content="pt_BR">
+<meta property="og:title" content="Delineador Matricial de ECG">
+<meta property="og:description" content="Envie um ECG (EDF, WFDB ou CSV) e veja cada QRS, o ponto J e a onda T marcados pela matriz de distância. Tudo roda no navegador. TCC de Felipe Garcia Papani, UFPE.">
+<meta property="og:url" content="https://felipepapani.github.io/tcc-ecg-fv/">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23b0213a'/%3E%3Cpolyline points='3,18 10,18 12,14 14,18 16,5 18,26 20,18 23,18 25,15 27,18 29,18' fill='none' stroke='%23fff' stroke-width='2.2' stroke-linejoin='round' stroke-linecap='round'/%3E%3C/svg%3E">
 <title>Delineador Matricial de ECG</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
@@ -40,6 +48,10 @@ h2 { font-size: 1.15rem; font-weight: 600; }
 .wrap { max-width: 1320px; margin: 0 auto; display: grid; gap: 18px; }
 header.topo { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 10px 24px; border-bottom: 2px solid var(--tinta); padding-bottom: 12px; }
 header.topo p { margin: 4px 0 0; color: var(--tinta-2); max-width: 68ch; }
+header.topo p.autoria { font-size: 13px; margin-top: 8px; }
+header.topo p.autoria b { color: var(--tinta); font-weight: 600; }
+body.soltar::after { content: "Solte o arquivo para analisar"; position: fixed; inset: 10px; z-index: 50; display: grid; place-items: center; border: 3px dashed var(--acento); border-radius: 10px;
+  background: color-mix(in srgb, var(--papel) 88%, transparent); color: var(--acento); font-family: var(--font-titulo); font-size: 1.5rem; font-weight: 700; pointer-events: none; }
 .selo { font-family: var(--font-dado); font-size: 12px; color: var(--acento); border: 1px solid var(--acento); padding: 3px 8px; border-radius: 3px; white-space: nowrap; }
 .grade { display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 18px; align-items: start; }
 @media (max-width: 900px) { .grade { grid-template-columns: minmax(0, 1fr); } }
@@ -140,6 +152,7 @@ a { color: var(--qrs); }
     <div>
       <h1>Delineador Matricial de ECG</h1>
       <p>Envie um ECG e a página encontra cada QRS pela matriz de distância (método de Nicole Charron) e marca início, pico e fim da onda T. Tudo roda no seu navegador: o arquivo não sai do seu computador.</p>
+      <p class="autoria">Trabalho de Conclusão de Curso de <b>Felipe Garcia Papani</b> · Engenharia Biomédica, UFPE, 2026 · orientação do Prof. Fernando José Ribeiro Sales · <a href="https://github.com/felipepapani/tcc-ecg-fv" target="_blank" rel="noopener">código e resultados</a></p>
     </div>
     <span class="selo">FERRAMENTA DE PESQUISA · NÃO DIAGNÓSTICA</span>
   </header>
@@ -161,6 +174,7 @@ a { color: var(--qrs); }
         <details class="tutorial">
           <summary>Como preparar e enviar o arquivo</summary>
           <div class="tut-corpo">
+            <p>Clique em “Escolher arquivos” ou arraste os arquivos para qualquer ponto da página.</p>
             <h3>EDF ou BDF <span>um arquivo só</span></h3>
             <p>Formato de exportação da maioria dos Holter e polígrafos. Exporte o exame como <code>.edf</code> no programa do aparelho e selecione esse arquivo. A página usa os canais de maior taxa de amostragem (o ECG) e ignora anotações e canais lentos, como a oximetria.</p>
 
@@ -179,7 +193,7 @@ a { color: var(--qrs); }
 0.004,-0.047,0.026</pre>
             <ul>
               <li>Separador: vírgula, ponto e vírgula ou tabulação. Com ponto e vírgula, a vírgula decimal funciona (<code>-0,052</code>).</li>
-              <li>Depois de carregar, confira a amostragem e a unidade. Se a 1ª coluna for o tempo, marque a opção: a amostragem sai dela.</li>
+              <li>Depois de carregar, confira a amostragem e a unidade. Uma 1ª coluna de tempo é reconhecida sozinha, e a amostragem sai dela; se não for, marque a opção.</li>
               <li>Linhas de texto antes dos números são ignoradas. Se nelas aparecer a amostragem (“Sample Rate, 512 Hz”) ou a unidade (µV), a página já preenche.</li>
               <li>Python: <code>np.savetxt('ecg.csv', sinais, delimiter=',')</code>. MATLAB: <code>writematrix(sinais, 'ecg.csv')</code>. Em <code>sinais</code>, uma coluna por derivação.</li>
             </ul>
@@ -328,6 +342,7 @@ a { color: var(--qrs); }
       <footer>
         <p><b>Detecção do QRS:</b> método de Nicole Charron (TCC, Engenharia Biomédica, UFPE), usado com autorização: matriz de distância do ECG, binarização no percentil 95 %, soma das colunas, limiar de 75 % do máximo e agrupamento DBSCAN. Código original em <a href="https://github.com/Ni-cole17/PTB-Diagnostic-Visualization" target="_blank" rel="noopener">github.com/Ni-cole17/PTB-Diagnostic-Visualization</a>.</p>
         <p><b>Bordas do QRS e da onda T:</b> Felipe G. Papani (TCC, UFPE). Cada amostra é medida pela distância à linha isoelétrica do batimento (uma coluna da matriz de distância), e as bordas saem pelo método do trapézio (Vázquez-Seisdedos et al., 2011) ou pela largura da faixa. Mesma implementação do código do TCC em Python, conferida amostra a amostra.</p>
+        <p><b>Como citar:</b> PAPANI, F. G. <i>Matriz de distância do eletrocardiograma na delineação de batimentos e na análise do segmento ST antes da fibrilação ventricular</i>. 2026. Trabalho de Conclusão de Curso (Bacharelado em Engenharia Biomédica) – Universidade Federal de Pernambuco, Recife, 2026. Código e resultados em <a href="https://github.com/felipepapani/tcc-ecg-fv" target="_blank" rel="noopener">github.com/felipepapani/tcc-ecg-fv</a> (licença MIT).</p>
         <p><b>Medidas:</b> QRS = início ao ponto J; QT = início do QRS ao fim da T; ST = ponto J ao início da T; ST60 = nível 60 ms após o ponto J menos o nível isoelétrico (derivação 1). FC, SDNN e RMSSD usam só intervalos entre 300 e 2000 ms que passam no filtro de ectópicos de 20 %. Ferramenta de pesquisa: não use para diagnóstico.</p>
       </footer>
     </main>
@@ -748,8 +763,8 @@ self.onmessage = function (ev) {
       var buf = buffers[arq.toLowerCase()];
       if (!buf) throw new Error('Falta o arquivo ' + arq + ' (selecione o .dat junto com o .hea).');
       var ids = porArq[arq], s0 = cab.sinais[ids[0]], ns = ids.length, fmtN = s0.fmt, dv = new DataView(buf, s0.off), bytes = buf.byteLength - s0.off, nq;
-      var tam = { 16: 2, 61: 2, 80: 1 }[fmtN];
-      if (fmtN === 212) nq = Math.floor(bytes * 2 / 3 / ns); else if (tam) nq = Math.floor(bytes / tam / ns); else throw new Error('Formato ' + fmtN + ' não é aceito (aceitos: 16, 61, 80, 212).');
+      var tam = { 16: 2, 24: 3, 32: 4, 61: 2, 80: 1 }[fmtN];
+      if (fmtN === 212) nq = Math.floor(bytes * 2 / 3 / ns); else if (tam) nq = Math.floor(bytes / tam / ns); else throw new Error('Formato ' + fmtN + ' não é aceito (aceitos: 16, 24, 32, 61, 80, 212).');
       if (!n || n > nq) n = nq;
       var brutos = ids.map(function () { return new Float64Array(nq); }), i, j, v;
       if (fmtN === 212) {
@@ -766,14 +781,21 @@ self.onmessage = function (ev) {
           var pos = (i * ns + j) * tam;
           if (fmtN === 16) { v = dv.getInt16(pos, true); if (v === -32768) v = NaN; }
           else if (fmtN === 61) { v = dv.getInt16(pos, false); if (v === -32768) v = NaN; }
+          else if (fmtN === 24) { v = dv.getUint8(pos) | (dv.getUint8(pos + 1) << 8) | (dv.getInt8(pos + 2) << 16); if (v === -8388608) v = NaN; }
+          else if (fmtN === 32) { v = dv.getInt32(pos, true); if (v === -2147483648) v = NaN; }
           else { v = dv.getUint8(pos) - 128; if (v === -128) v = NaN; }
           brutos[j][i] = v;
         }
       }
-      ids.forEach(function (k, jj) { var s = cab.sinais[k], c = brutos[jj]; for (var t = 0; t < c.length; t++) { var x = (c[t] - s.base) / s.ganho; c[t] = isFinite(x) ? x : 0; } chs[k] = c; });
+      ids.forEach(function (k, jj) {
+        var s = cab.sinais[k], c = brutos[jj], u = String(s.unid).toLowerCase();
+        var mult = /^(u|µ|μ)v/.test(u) ? 0.001 : (/^v$/.test(u) ? 1000 : (/^nv/.test(u) ? 1e-6 : 1));   // tudo em mV
+        for (var t = 0; t < c.length; t++) { var x = (c[t] - s.base) / s.ganho * mult; c[t] = isFinite(x) ? x : 0; }
+        chs[k] = c;
+      });
     });
     chs = chs.map(function (c) { return c.slice(0, n); });
-    return { nome: cab.nome, fs: cab.fs, chs: chs, nomes: cab.sinais.map(function (s) { return s.nome; }), unid: cab.sinais.map(function (s) { return s.unid; }), n: n, origem: 'WFDB' };
+    return { nome: cab.nome, fs: cab.fs, chs: chs, nomes: cab.sinais.map(function (s) { return s.nome; }), unid: cab.sinais.map(function () { return 'mV'; }), n: n, origem: 'WFDB' };
   }
   // Lê a parte de texto antes dos números: amostragem ("Sample Rate,512 hertz", "fs = 250") e unidade (µV, mV, V).
   function metadadosCsv(txt) {
@@ -801,7 +823,8 @@ self.onmessage = function (ev) {
     var dados = []; for (i = i0; i < todas.length; i++) { var lin = todas[i].split(sep); if (lin.length === nc) dados.push(lin.map(num)); }
     var c0 = colTempo ? 1 : 0;
     if (nc - c0 < 1) throw new Error('O CSV não tem colunas de sinal.');
-    if (colTempo) { var dt = []; for (i = 1; i < Math.min(dados.length, 2000); i++) dt.push(dados[i][0] - dados[i - 1][0]); var m = mediana(dt); if (m > 0) fs = Math.round(1 / m); }
+    // amostragem pelo passo médio do tempo em até 10 000 linhas (a mediana erraria com o tempo arredondado, ex.: 360 Hz com 3 casas)
+    if (colTempo) { var m = Math.min(dados.length, 10000) - 1, span = m > 0 ? dados[m][0] - dados[0][0] : 0; if (span > 0) fs = Math.round(m / span); }
     var chs = []; for (var c = c0; c < nc; c++) { var a = new Float64Array(dados.length); for (var t = 0; t < dados.length; t++) { var v = dados[t][c] * fator; a[t] = isFinite(v) ? v : 0; } chs.push(a); }
     return { nome: 'CSV', fs: fs, chs: chs, nomes: chs.map(function (_, k) { return cab ? (cab[k + c0] || '').trim().replace(/^"|"$/g, '') || ('Coluna ' + (k + 1)) : ('Coluna ' + (k + 1)); }), unid: chs.map(function () { return 'mV'; }), n: dados.length, origem: 'CSV' };
   }
@@ -885,8 +908,15 @@ self.onmessage = function (ev) {
     $('fonte').innerHTML = '<span>Registro <b>' + rec.nome.replace(/</g, '&lt;') + '</b></span><span><b>' + fmt(rec.fs, 0) + '</b> Hz</span><span><b>' + rec.chs.length + '</b> derivações</span><span>duração <b>' + fmt(dur / 60, 1) + '</b> min</span><span>origem: ' + rec.origem + '</span>';
     estado('Arquivo carregado. Ajuste o trecho e clique em Analisar.');
   }
-  $('arquivos').addEventListener('change', function (ev) {
-    var fs = Array.prototype.slice.call(ev.target.files || []);
+  $('arquivos').addEventListener('change', function (ev) { carregarArquivos(ev.target.files); });
+  // arrastar e soltar os arquivos em qualquer ponto da página
+  var arrastando = 0;
+  document.addEventListener('dragenter', function (e) { if (e.dataTransfer && Array.prototype.indexOf.call(e.dataTransfer.types, 'Files') >= 0) { arrastando++; document.body.classList.add('soltar'); } });
+  document.addEventListener('dragleave', function () { if (--arrastando <= 0) { arrastando = 0; document.body.classList.remove('soltar'); } });
+  document.addEventListener('dragover', function (e) { e.preventDefault(); });
+  document.addEventListener('drop', function (e) { e.preventDefault(); arrastando = 0; document.body.classList.remove('soltar'); if (e.dataTransfer && e.dataTransfer.files.length) carregarArquivos(e.dataTransfer.files); });
+  function carregarArquivos(lista) {
+    var fs = Array.prototype.slice.call(lista || []);
     if (!fs.length) return;
     var hea = fs.filter(function (f) { return /\.hea$/i.test(f.name); })[0], csv = fs.filter(function (f) { return /\.(csv|txt|tsv)$/i.test(f.name); })[0];
     var edf = fs.filter(function (f) { return /\.(edf|bdf)$/i.test(f.name); })[0];
@@ -904,10 +934,23 @@ self.onmessage = function (ev) {
         ULTIMO_CSV = t; var md = metadadosCsv(t);
         if (md.fs >= 50 && md.fs <= 5000) $('fs-csv').value = md.fs;
         if (md.unid) $('un-csv').value = md.unid;
+        $('col-tempo').checked = primeiraColunaETempo(t);
         usarRegistro(lerCsvAtual(t)); analisar();
       }).catch(function (e) { estado('Não consegui ler o CSV: ' + e.message, true); });
     } else estado('Selecione um .edf, um .hea com o .dat, ou um .csv.', true);
-  });
+  }
+  // 1ª coluna é tempo se o nome diz isso ou se ela sobe em passos constantes (um ECG não faz isso)
+  function primeiraColunaETempo(t) {
+    try {
+      var r = lerCsv(t, 250, false, 1); if (r.chs.length < 2) return false;
+      if (/^(t|time|tempo|seg|sec|second|segundo)s?\b|^(t|time|tempo)[_ (]/i.test(r.nomes[0])) return true;
+      var c = r.chs[0], m = Math.min(c.length, 500), d = [];
+      for (var i = 1; i < m; i++) d.push(c[i] - c[i - 1]);
+      // sempre crescente, com passos parecidos (tolera o arredondamento do tempo no arquivo)
+      var mn = Math.min.apply(null, d), mx = Math.max.apply(null, d);
+      return d.length > 10 && mn > 0 && mx <= 3 * mn;
+    } catch (e) { return false; }
+  }
   var FATOR_UN = { mV: 1, uV: 0.001, V: 1000 };
   function lerCsvAtual(t) {
     var r = lerCsv(t, parseFloat($('fs-csv').value) || 250, $('col-tempo').checked, FATOR_UN[$('un-csv').value]);

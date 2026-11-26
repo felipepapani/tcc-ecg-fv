@@ -3,7 +3,7 @@
 Código, resultados e ferramenta web do Trabalho de Conclusão de Curso de **Felipe Garcia Papani**
 (Engenharia Biomédica, UFPE, 2026), orientado pelo Prof. Fernando José Ribeiro Sales.
 
-- **Ferramenta web:** https://felipepapani.github.io/tcc-ecg-fv/ (detecção de QRS e delineação no navegador; o ECG não sai do computador)
+- **Ferramenta web:** https://felipepapani.github.io/tcc-ecg-fv/ (detecção de QRS e delineação no navegador, com arquivos EDF, WFDB ou CSV; o ECG não sai do computador; veja [Ferramenta web](#ferramenta-web))
 - **DOI (Zenodo):** _será gerado na primeira versão publicada_
 - **Trabalho anterior:** código do artigo do CBEB 2026 em [felipepapani/Paper-CBEB](https://github.com/felipepapani/Paper-CBEB) ([doi:10.5281/zenodo.21689324](https://doi.org/10.5281/zenodo.21689324))
 
@@ -35,6 +35,37 @@ resultados/
   csv/                          todos os números citados no texto (numeros_tcc.csv é a tabela-resumo)
   figuras/                      figuras do TCC
 docs/index.html                 ferramenta web (publicada pelo GitHub Pages)
+testes/                         testes dos leitores de arquivo da ferramenta web (EDF, WFDB, CSV)
+```
+
+## Ferramenta web
+
+A página [felipepapani.github.io/tcc-ecg-fv](https://felipepapani.github.io/tcc-ecg-fv/) roda a detecção de QRS pela
+matriz de distância e a delineação do QRS e da onda T no navegador. O arquivo é lido localmente e não é enviado a
+nenhum servidor. É uma ferramenta de pesquisa, não de diagnóstico.
+
+### Formatos aceitos
+
+| Formato | O que selecionar | Detalhes |
+| --- | --- | --- |
+| **EDF, EDF+ ou BDF** | um arquivo `.edf` ou `.bdf` | Padrão de exportação da maioria dos Holter e polígrafos. A página usa os canais com a maior taxa de amostragem (o ECG) e ignora anotações e canais lentos (oximetria, por exemplo). Unidades µV, mV e V são convertidas para mV. |
+| **WFDB (PhysioNet)** | o `.hea` e o `.dat` do registro, juntos | Formatos 16, 24, 32, 61, 80 e 212 (o da SDDB e da QTDB). Unidades do cabeçalho convertidas para mV. Registros de vários segmentos e os formatos 310/311 não são aceitos. |
+| **CSV ou texto** | um `.csv`, `.tsv` ou `.txt` | Uma linha por amostra e uma coluna por derivação. Separador vírgula, ponto e vírgula, tabulação ou espaços; com ponto e vírgula ou tabulação, a vírgula decimal é aceita. A linha de nomes é opcional. Amostragem e unidade (mV, µV, V) são escolhidas na página; uma 1ª coluna de tempo é reconhecida sozinha, e a amostragem sai dela. Linhas de texto antes dos números são ignoradas, e a amostragem (“Sample Rate”) e a unidade (µV) escritas nelas são lidas. |
+
+Os arquivos podem ser escolhidos no botão ou arrastados para a página. O tutorial “Como preparar e enviar o arquivo”,
+na própria página, mostra o passo a passo e oferece um CSV de exemplo. Cada trecho analisado tem até 60 min; um Holter
+de 24 h abre inteiro e é analisado em partes.
+
+### Testes dos leitores
+
+`testes/gerar_casos.py` escreve arquivos em todos os formatos com as bibliotecas de referência (`wfdb` e `pyedflib`) e
+relê o sinal esperado com elas; `testes/testar_leitores.mjs` lê os mesmos arquivos com o código da página e compara
+amostra a amostra. Inclui casos que devem ser recusados (formato não aceito, `.dat` faltando, arquivo inválido).
+
+```bash
+pip install wfdb pyedflib numpy
+python testes/gerar_casos.py
+node testes/testar_leitores.mjs     # Node 18 ou mais novo
 ```
 
 ## Dados
