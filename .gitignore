@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+.DS_Store
+# sinais baixados do PhysioNet e saídas locais (não versionar)
+SDDB_atr/
+NSRDB_atr/
+QTDB/
+*.dat
+*.hea
+*.atr
+tcc_final/

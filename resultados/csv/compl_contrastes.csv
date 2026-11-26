@@ -1,0 +1,12 @@
+medida,contraste,n SDDB,mediana SDDB (mV),positivos SDDB,p Wilcoxon SDDB,n NSRDB,mediana NSRDB (mV),positivos NSRDB,p Wilcoxon NSRDB,g,IC 95 % do g,p Mann–Whitney
+ST60 na derivação 2 (spline),última hora − basal (antes de −2 h),12,"0,029",12/12,"0,0005",18,"0,004",12/18,"0,284","1,17","[0,66; 1,86]","0,0009"
+ST60 na derivação 2 (spline),última hora − faixa de −3 a −2 h,12,"0,023",11/12,"0,0010",18,"0,006",11/18,"0,799","1,05","[0,50; 1,73]","0,0043"
+ST60 na derivação 2 (spline),faixa de −2 a −1 h − basal (antes de −2 h),12,"0,009",8/12,"0,0923",18,"0,008",12/18,"0,099","0,41","[−0,33; 1,15]","0,6567"
+ST60 na derivação 2 (spline),faixa de −3 a −2 h − antes de −3 h,10,"0,006",6/10,"0,3750",14,"0,004",8/14,"0,670","−0,01","[−0,67; 0,86]","0,5780"
+ST60 na derivação 1 (spline),última hora − basal (antes de −2 h),12,"0,033",9/12,"0,0425",18,"0,001",9/18,"0,932","1,00","[0,35; 1,80]","0,0210"
+ST60 na derivação 1 (spline),última hora − faixa de −3 a −2 h,12,"0,031",8/12,"0,0771",18,"−0,001",9/18,"0,932","0,71","[−0,10; 1,63]","0,0361"
+ST60 na derivação 1 (spline),faixa de −2 a −1 h − basal (antes de −2 h),12,"0,013",9/12,"0,0640",18,"0,005",11/18,"0,609","0,78","[0,03; 1,76]","0,0864"
+ST60 na derivação 1 (spline),faixa de −3 a −2 h − antes de −3 h,10,"0,007",6/10,"0,5566",14,"0,005",9/14,"0,463","0,43","[−0,41; 1,21]","0,7035"
+ST60 na derivação 2 (linha de base por filtro de mediana),última hora − basal (antes de −2 h),12,"0,021",12/12,"0,0005",18,"−0,001",8/18,"0,932","1,07","[0,58; 1,67]","0,0025"
+ST60 na derivação 1 (linha de base por filtro de mediana),última hora − basal (antes de −2 h),12,"0,010",10/12,"0,0210",18,"−0,006",8/18,"0,468","0,86","[0,40; 1,44]","0,0262"
+ST60 na derivação 2 (spline),resíduo na última hora do modelo ajustado no basal (FC e ruído),9,"0,031",6/9,"0,0977",14,"−0,005",5/14,"0,583","1,01","[0,23; 2,06]","0,0215"

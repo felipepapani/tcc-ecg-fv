@@ -1,0 +1,7 @@
+variante,"p95 |erro|, viés por registro (ms)",mediana |erro no RR| (ms),p95 |erro no RR| (ms),% RR com erro > 20 ms
+Limiar 50 % + refino,28.0,4.0,32.0,10.0
+Nicole (centroide),20.0,4.0,24.0,5.9
+Nicole + refino do pico,28.0,4.0,32.0,9.7
+Referência móvel 50 %,20.0,4.0,28.0,6.0
+Referência móvel 75 %,20.0,4.0,28.0,6.2
+xqrs (WFDB),32.0,4.0,32.0,7.3

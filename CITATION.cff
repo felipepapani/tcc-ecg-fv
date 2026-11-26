@@ -1,0 +1,46 @@
+cff-version: 1.2.0
+message: "Se usar este código ou estes resultados, cite o TCC e este repositório."
+title: "Matriz de distância do ECG na delineação de batimentos e na análise do segmento ST antes da fibrilação ventricular: código e resultados"
+abstract: >-
+  Código, resultados e ferramenta web do Trabalho de Conclusão de Curso em
+  Engenharia Biomédica (UFPE, 2026). Avalia a detecção de QRS pela matriz de
+  distância em Holter de 24 h (SDDB), delineia ponto J, onda T e onda P pela
+  distância ao nível isoelétrico com validação na QT Database, e compara medidas
+  do segmento ST e da onda P entre a última hora antes da fibrilação ventricular
+  e o basal, em pacientes da SDDB e controles da NSRDB.
+type: software
+license: MIT
+version: "1.0.0"
+date-released: "2026-11-26"
+repository-code: "https://github.com/felipepapani/tcc-ecg-fv"
+url: "https://felipepapani.github.io/tcc-ecg-fv/"
+keywords:
+  - eletrocardiograma
+  - matriz de distância
+  - delineação de ECG
+  - segmento ST
+  - fibrilação ventricular
+  - recurrence quantification analysis
+  - Holter
+authors:
+  - family-names: "Papani"
+    given-names: "Felipe Garcia"
+    affiliation: "Universidade Federal de Pernambuco (UFPE)"
+references:
+  - type: software
+    title: "RQA of the ECG for Ventricular Fibrillation — SDDB: reproducibility code"
+    doi: "10.5281/zenodo.21689324"
+    authors:
+      - family-names: "Papani"
+        given-names: "F. G."
+preferred-citation:
+  type: thesis
+  thesis-type: "Trabalho de Conclusão de Curso (Bacharelado em Engenharia Biomédica)"
+  title: "Matriz de distância do eletrocardiograma na delineação de batimentos e na análise do segmento ST antes da fibrilação ventricular"
+  year: 2026
+  institution:
+    name: "Universidade Federal de Pernambuco"
+    city: "Recife"
+  authors:
+    - family-names: "Papani"
+      given-names: "Felipe Garcia"

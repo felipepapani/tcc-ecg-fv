@@ -1,0 +1,17 @@
+item,valor
+Delta de Cliff (SDDB × NSRDB),"0,73"
+Probabilidade de um paciente variar mais que um controle,"86,6 %"
+Retirando um controle por vez: g mínimo a máximo; menor limite inferior do IC,"1,12 a 1,31; 0,60"
+Retirando um paciente por vez (12 retiradas): g mínimo a máximo; menor limite inferior do IC,"1,07 a 1,31; 0,50"
+"Mediana da variação, SDDB, com IC 95 % por bootstrap (mV)","0,029 [0,021; 0,051]"
+"Menor e maior variação, SDDB (mV)","0,001 e 0,135"
+"Mediana da variação, NSRDB, com IC 95 % por bootstrap (mV)","0,004 [−0,003; 0,014]"
+"Menor e maior variação, NSRDB (mV)","−0,066 e 0,055"
+Registro da SDDB fora da análise,46 (nenhuma janela aprovada na última hora; 41 % de janelas aprovadas no registro)
+Diagnóstico dos batimentos perdidos pelo método de Charron: total analisado (7 registros anotados),6908
+Batimentos perdidos em janelas cujo máximo da soma das colunas pertence a: ectópico (V),"55,1 %"
+Batimentos perdidos em janelas cujo máximo da soma das colunas pertence a: normal (N),"38,3 %"
+Batimentos perdidos em janelas cujo máximo da soma das colunas pertence a: sem batimento: artefato/ruído,"6,3 %"
+Batimentos perdidos em janelas cujo máximo da soma das colunas pertence a: ectópico (J),"0,1 %"
+Batimentos perdidos em janelas cujo máximo da soma das colunas pertence a: ectópico (F),"0,1 %"
+Batimentos perdidos em janelas cujo máximo da soma das colunas pertence a: ectópico (S),"0,0 %"

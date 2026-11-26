@@ -1,0 +1,976 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Detecção de QRS e delineação de batimentos de ECG pela matriz de distância, executada no navegador.">
+<title>Delineador Matricial de ECG</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: bancada de instrumento — painel de controle à esquerda, área de traçado em papel milimetrado de ECG à direita. */
+:root {
+  --papel: #fbf7f7;        /* fundo, papel de ECG */
+  --painel: #ffffff;
+  --tinta: #1c2229;        /* texto e traçado */
+  --tinta-2: #59626c;
+  --grade-fina: #f3d9dd;   /* quadriculado de 1 mm */
+  --grade-grossa: #e6aab3; /* quadriculado de 5 mm */
+  --linha: #e4dadb;
+  --qrs: #1f5fae;          /* marcações do QRS */
+  --onda-t: #c4561b;       /* marcações da onda T */
+  --acento: #b0213a;       /* vermelho de monitor */
+  --ok: #2c7a4b;
+  --font-titulo: "IBM Plex Sans Condensed", "Arial Narrow", system-ui, sans-serif;
+  --font-texto: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-dado: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --papel: #121519; --painel: #191d22; --tinta: #e5e8eb; --tinta-2: #9aa3ad; --grade-fina: #2a2125; --grade-grossa: #4a3239;
+  --linha: #2b3037; --qrs: #6ea3ea; --onda-t: #f0904f; --acento: #ef5b72; --ok: #5dbb84; color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --papel: #121519; --painel: #191d22; --tinta: #e5e8eb; --tinta-2: #9aa3ad; --grade-fina: #2a2125; --grade-grossa: #4a3239;
+  --linha: #2b3037; --qrs: #6ea3ea; --onda-t: #f0904f; --acento: #ef5b72; --ok: #5dbb84; color-scheme: dark; }
+* { box-sizing: border-box; }
+body { background: var(--papel); color: var(--tinta); font-family: var(--font-texto); font-size: 15px; line-height: 1.5;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 20px 40px; }
+h1, h2, h3 { font-family: var(--font-titulo); text-wrap: balance; margin: 0; letter-spacing: 0.01em; }
+h1 { font-size: 1.9rem; font-weight: 700; }
+h2 { font-size: 1.15rem; font-weight: 600; }
+.wrap { max-width: 1320px; margin: 0 auto; display: grid; gap: 18px; }
+header.topo { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 10px 24px; border-bottom: 2px solid var(--tinta); padding-bottom: 12px; }
+header.topo p { margin: 4px 0 0; color: var(--tinta-2); max-width: 68ch; }
+.selo { font-family: var(--font-dado); font-size: 12px; color: var(--acento); border: 1px solid var(--acento); padding: 3px 8px; border-radius: 3px; white-space: nowrap; }
+.grade { display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 18px; align-items: start; }
+@media (max-width: 900px) { .grade { grid-template-columns: minmax(0, 1fr); } }
+aside.controles { background: var(--painel); border: 1px solid var(--linha); border-radius: 6px; padding: 16px; display: grid; gap: 16px; }
+@media (min-width: 901px) { aside.controles { position: sticky; top: calc(12px + env(safe-area-inset-top, 0px)); } }
+fieldset { border: 0; padding: 0; margin: 0; display: grid; gap: 8px; min-width: 0; }
+legend { font-family: var(--font-titulo); font-weight: 600; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--tinta-2); margin-bottom: 4px; padding: 0; }
+label { font-size: 13.5px; display: grid; gap: 3px; }
+.linha2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+input[type=number], select { font: inherit; font-family: var(--font-dado); font-size: 13.5px; padding: 6px 8px; border: 1px solid var(--linha); border-radius: 4px; background: var(--papel); color: var(--tinta); width: 100%; min-width: 0; }
+input[type=file] { font-size: 13px; max-width: 100%; color: var(--tinta-2); }
+.check { display: flex; gap: 8px; align-items: center; font-size: 13.5px; }
+.canais { display: flex; flex-wrap: wrap; gap: 4px 12px; font-family: var(--font-dado); font-size: 12.5px; }
+button { font: inherit; font-weight: 600; cursor: pointer; border-radius: 4px; border: 1px solid var(--tinta); background: var(--painel); color: var(--tinta); padding: 7px 12px; }
+button.primario { background: var(--acento); border-color: var(--acento); color: #fff; width: 100%; padding: 10px; font-family: var(--font-titulo); font-size: 1rem; letter-spacing: 0.03em; }
+button:disabled { opacity: 0.5; cursor: wait; }
+button:focus-visible, input:focus-visible, select:focus-visible, canvas:focus-visible { outline: 2px solid var(--qrs); outline-offset: 2px; }
+.dica { font-size: 12.5px; color: var(--tinta-2); margin: 0; }
+.barra { height: 6px; background: var(--linha); border-radius: 3px; overflow: hidden; }
+.barra > div { height: 100%; width: 0; background: var(--acento); transition: width 0.15s; }
+.estado { font-family: var(--font-dado); font-size: 12.5px; color: var(--tinta-2); min-height: 1.4em; overflow-wrap: anywhere; }
+.estado.erro { color: var(--acento); }
+main.area { display: grid; gap: 18px; min-width: 0; }
+.fonte { font-family: var(--font-dado); font-size: 13px; color: var(--tinta-2); display: flex; flex-wrap: wrap; gap: 4px 16px; }
+.fonte b { color: var(--tinta); font-weight: 500; }
+.medidas { display: grid; grid-template-columns: repeat(auto-fit, minmax(104px, 1fr)); gap: 0; border: 1px solid var(--linha); border-radius: 6px; background: var(--painel); overflow: hidden; }
+.medida { padding: 10px 14px; border-right: 1px solid var(--linha); border-bottom: 1px solid var(--linha); margin: 0 -1px -1px 0; display: grid; gap: 2px; }
+.medida dt { font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--tinta-2); font-family: var(--font-titulo); font-weight: 600; }
+.medida dd { margin: 0; font-family: var(--font-dado); font-size: 1.2rem; font-variant-numeric: tabular-nums; }
+.medida dd small { font-size: 0.72rem; color: var(--tinta-2); margin-left: 3px; }
+.cartao { background: var(--painel); border: 1px solid var(--linha); border-radius: 6px; padding: 14px; display: grid; gap: 10px; min-width: 0; }
+.cab { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; }
+.cab .ctrl { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.cab .ctrl select { width: auto; }
+.legenda { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 12.5px; color: var(--tinta-2); }
+.legenda i { display: inline-block; width: 14px; height: 10px; margin-right: 5px; vertical-align: -1px; border-radius: 2px; }
+canvas { display: block; width: 100%; touch-action: pan-y; }
+#tela-tac { height: 120px; cursor: pointer; }
+#tela-ecg { height: 360px; }
+.duas { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 18px; align-items: start; }
+@media (max-width: 1100px) { .duas { grid-template-columns: minmax(0, 1fr); } }
+#tela-mat { aspect-ratio: 1 / 1; max-width: 100%; max-height: 440px; width: auto; height: auto; margin: 0 auto; }
+#tela-soma { height: 110px; }
+.tabela { overflow: auto; max-height: 360px; border: 1px solid var(--linha); border-radius: 4px; }
+table { border-collapse: collapse; font-family: var(--font-dado); font-size: 12.5px; font-variant-numeric: tabular-nums; width: 100%; }
+th, td { padding: 4px 8px; text-align: right; white-space: nowrap; border-bottom: 1px solid var(--linha); }
+th { position: sticky; top: 0; background: var(--painel); font-family: var(--font-titulo); font-weight: 600; font-size: 12px; color: var(--tinta-2); }
+tr.ativo td { background: color-mix(in srgb, var(--qrs) 14%, transparent); }
+tbody tr { cursor: pointer; }
+textarea { width: 100%; font-family: var(--font-dado); font-size: 12px; min-height: 120px; background: var(--papel); color: var(--tinta); border: 1px solid var(--linha); border-radius: 4px; }
+footer { font-size: 13px; color: var(--tinta-2); border-top: 1px solid var(--linha); padding-top: 12px; display: grid; gap: 6px; }
+footer p { margin: 0; max-width: 90ch; }
+a { color: var(--qrs); }
+@media (prefers-reduced-motion: reduce) { .barra > div { transition: none; } }
+</style>
+<div class="wrap">
+  <header class="topo">
+    <div>
+      <h1>Delineador Matricial de ECG</h1>
+      <p>Envie um ECG e a página encontra cada QRS pela matriz de distância (método de Nicole Charron) e marca início, pico e fim da onda T. Tudo roda no seu navegador: o arquivo não sai do seu computador.</p>
+    </div>
+    <span class="selo">FERRAMENTA DE PESQUISA · NÃO DIAGNÓSTICA</span>
+  </header>
+
+  <div class="grade">
+    <aside class="controles" aria-label="Controles">
+      <fieldset>
+        <legend>Arquivo</legend>
+        <label for="arquivos">WFDB (.hea + .dat) ou CSV
+          <input type="file" id="arquivos" multiple accept=".hea,.dat,.csv,.txt,.tsv">
+        </label>
+        <p class="dica">No formato do PhysioNet, selecione os dois arquivos juntos (ex.: <code>sel30.hea</code> e <code>sel30.dat</code>). No CSV, uma coluna por derivação, em mV.</p>
+        <div id="opcoes-csv" hidden>
+          <div class="linha2">
+            <label for="fs-csv">Amostragem (Hz)<input type="number" id="fs-csv" value="250" min="50" max="5000" step="1"></label>
+            <label class="check" style="align-self:end"><input type="checkbox" id="col-tempo"> 1ª coluna é tempo (s)</label>
+          </div>
+        </div>
+        <button type="button" id="btn-exemplo">Carregar o exemplo sintético</button>
+      </fieldset>
+
+      <fieldset>
+        <legend>Trecho analisado</legend>
+        <div class="linha2">
+          <label for="ini-s">Início (s)<input type="number" id="ini-s" value="0" min="0" step="1"></label>
+          <label for="dur-min">Duração (min)<input type="number" id="dur-min" value="30" min="0.1" max="60" step="0.5"></label>
+        </div>
+        <p class="dica">Até 60 min por vez. Um Holter de 24 h pode ser analisado em partes.</p>
+        <div>
+          <span class="dica">Derivações usadas na matriz</span>
+          <div class="canais" id="canais"></div>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Parâmetros</legend>
+        <div class="linha2">
+          <label for="p-q">Percentil da matriz
+            <select id="p-q"><option value="0.90">90 %</option><option value="0.95" selected>95 % (Nicole)</option><option value="0.98">98 %</option></select>
+          </label>
+          <label for="p-frac">Limiar da soma
+            <select id="p-frac"><option value="0.75" selected>75 % (Nicole)</option><option value="0.5">50 %</option></select>
+          </label>
+        </div>
+        <div class="linha2">
+          <label for="p-alfa">Faixa da onda T
+            <select id="p-alfa"><option value="0.1">10 %</option><option value="0.2" selected>20 %</option><option value="0.3">30 %</option></select>
+          </label>
+          <label class="check" style="align-self:end"><input type="checkbox" id="p-refino" checked> Refinar pico R</label>
+        </div>
+      </fieldset>
+
+      <button type="button" class="primario" id="btn-analisar">Analisar</button>
+      <div class="barra" aria-hidden="true"><div id="progresso"></div></div>
+      <div class="estado" id="estado" role="status" aria-live="polite"></div>
+    </aside>
+
+    <main class="area">
+      <div class="fonte" id="fonte"></div>
+
+      <dl class="medidas" id="medidas"></dl>
+
+      <section class="cartao" aria-labelledby="t-tac">
+        <div class="cab"><h2 id="t-tac">Tacograma</h2><span class="dica">Intervalo RR de cada batimento. Clique para ir àquele instante.</span></div>
+        <canvas id="tela-tac" tabindex="0" aria-label="Tacograma: intervalos RR ao longo do tempo"></canvas>
+      </section>
+
+      <section class="cartao" aria-labelledby="t-ecg">
+        <div class="cab">
+          <h2 id="t-ecg">Traçado e marcações</h2>
+          <div class="ctrl">
+            <button type="button" id="btn-ant" aria-label="Trecho anterior">◀</button>
+            <button type="button" id="btn-prox" aria-label="Próximo trecho">▶</button>
+            <label class="check" for="zoom">Janela
+              <select id="zoom"><option value="3">3 s</option><option value="6" selected>6 s</option><option value="10">10 s</option></select>
+            </label>
+            <label class="check" for="sinal-vis">Sinal
+              <select id="sinal-vis"><option value="prep" selected>Para ondas lentas</option><option value="filt">Filtrado 1–50 Hz</option><option value="bruto">Bruto</option></select>
+            </label>
+          </div>
+        </div>
+        <canvas id="tela-ecg" tabindex="0" aria-label="Traçado do ECG com as marcações"></canvas>
+        <div class="legenda">
+          <span><i style="background:var(--qrs);opacity:.25"></i>QRS (início → ponto J)</span>
+          <span><i style="background:var(--onda-t);opacity:.3"></i>Onda T (início → fim, trapézio)</span>
+          <span><i style="background:var(--onda-t)"></i>Pico da T</span>
+          <span><i style="border:1.5px dashed var(--onda-t);background:none"></i>Bordas da T pela faixa</span>
+          <span>Grade: 0,2 s × 0,5 mV</span>
+        </div>
+      </section>
+
+      <div class="duas">
+        <section class="cartao" aria-labelledby="t-mat">
+          <div class="cab">
+            <h2 id="t-mat">Matriz de distância</h2>
+            <div class="ctrl"><label class="check" for="vis-mat">
+              <select id="vis-mat"><option value="d" selected>Distâncias</option><option value="b">Binarizada</option></select></label></div>
+          </div>
+          <p class="dica" id="info-mat">Janela de 4 s que começa no início do traçado acima.</p>
+          <canvas id="tela-mat" aria-label="Matriz de distância da janela atual"></canvas>
+          <canvas id="tela-soma" aria-label="Soma das colunas da matriz binarizada com o limiar"></canvas>
+        </section>
+
+        <section class="cartao" aria-labelledby="t-bat">
+          <div class="cab">
+            <h2 id="t-bat">Batimentos</h2>
+            <button type="button" id="btn-copiar">Copiar CSV</button>
+          </div>
+          <p class="dica">Tempos em segundos desde o início do arquivo; durações em ms. Clique numa linha para ver o batimento.</p>
+          <div class="tabela"><table><thead><tr><th>#</th><th>R (s)</th><th>RR</th><th>QRS</th><th>QT</th><th>ST</th><th>T</th><th>ST60 (mV)</th></tr></thead><tbody id="corpo"></tbody></table></div>
+          <textarea id="csv-fallback" hidden aria-label="CSV para copiar"></textarea>
+        </section>
+      </div>
+
+      <footer>
+        <p><b>Detecção do QRS:</b> método de Nicole Charron (TCC, Engenharia Biomédica, UFPE), usado com autorização: matriz de distância do ECG, binarização no percentil 95 %, soma das colunas, limiar de 75 % do máximo e agrupamento DBSCAN. Código original em <a href="https://github.com/Ni-cole17/PTB-Diagnostic-Visualization" target="_blank" rel="noopener">github.com/Ni-cole17/PTB-Diagnostic-Visualization</a>.</p>
+        <p><b>Bordas do QRS e da onda T:</b> Felipe G. Papani (TCC, UFPE). Cada amostra é medida pela distância à linha isoelétrica do batimento (uma coluna da matriz de distância), e as bordas saem pelo método do trapézio (Vázquez-Seisdedos et al., 2011) ou pela largura da faixa. Mesma implementação do código do TCC em Python, conferida amostra a amostra.</p>
+        <p><b>Medidas:</b> QRS = início ao ponto J; QT = início do QRS ao fim da T; ST = ponto J ao início da T; ST60 = nível 60 ms após o ponto J menos o nível isoelétrico (derivação 1). FC, SDNN e RMSSD usam só intervalos entre 300 e 2000 ms que passam no filtro de ectópicos de 20 %. Ferramenta de pesquisa: não use para diagnóstico.</p>
+      </footer>
+    </main>
+  </div>
+</div>
+
+<script id="alg-src">
+/* Porte fiel de tcc_lib.py (seções 8 e 9): detecção de QRS pela matriz de distância (método de Nicole Charron)
+   e delineação do batimento (início/fim do QRS, início/pico/fim da T). Mesma aritmética do Python:
+   arredondamento "metade para o par" (round do Python/numpy), truncamento onde o Python usa int(),
+   matriz em float32, quantil com interpolação linear, filtros do scipy (butter + filtfilt, median_filter
+   modo 'nearest', maximum/uniform_filter1d modo 'reflect'). Sem dependências: roda no navegador e no Node. */
+var ALG = (function () {
+  'use strict';
+
+  // ---------- utilidades numéricas ----------
+  function pyRound(x) {
+    var f = Math.floor(x), d = x - f;
+    if (d === 0.5) return (f % 2 === 0) ? f : f + 1;
+    return Math.round(x);
+  }
+  var trunc = Math.trunc;
+  function argmax(a, i0, i1) { var k = i0, m = a[i0]; for (var i = i0 + 1; i < i1; i++) if (a[i] > m) { m = a[i]; k = i; } return k; }
+  function argmin(a, i0, i1) { var k = i0, m = a[i0]; for (var i = i0 + 1; i < i1; i++) if (a[i] < m) { m = a[i]; k = i; } return k; }
+  function mediana(arr) {
+    var s = Array.prototype.slice.call(arr).sort(function (a, b) { return a - b; });
+    var n = s.length; if (!n) return NaN;
+    return n % 2 ? s[(n - 1) / 2] : (s[n / 2 - 1] + s[n / 2]) / 2;
+  }
+  function gradiente(y) {
+    var n = y.length, g = new Float64Array(n);
+    if (n < 2) return g;
+    g[0] = y[1] - y[0]; g[n - 1] = y[n - 1] - y[n - 2];
+    for (var i = 1; i < n - 1; i++) g[i] = (y[i + 1] - y[i - 1]) / 2;
+    return g;
+  }
+  function reflectIdx(i, n) {           // scipy.ndimage modo 'reflect' (d c b a | a b c d | d c b a)
+    if (n === 1) return 0;
+    var p = 2 * n;
+    i = ((i % p) + p) % p;
+    return i < n ? i : p - 1 - i;
+  }
+  function maxFilter1d(x, size) {
+    var n = x.length, out = new Float64Array(n), lo = -Math.floor(size / 2), hi = size - Math.floor(size / 2) - 1;
+    for (var i = 0; i < n; i++) { var m = -Infinity; for (var o = lo; o <= hi; o++) { var v = x[reflectIdx(i + o, n)]; if (v > m) m = v; } out[i] = m; }
+    return out;
+  }
+  function uniformFilter1d(x, size) {
+    var n = x.length, out = new Float64Array(n), lo = -Math.floor(size / 2), hi = size - Math.floor(size / 2) - 1;
+    for (var i = 0; i < n; i++) { var s = 0; for (var o = lo; o <= hi; o++) s += x[reflectIdx(i + o, n)]; out[i] = s / size; }
+    return out;
+  }
+  function medianFilterNearest(x, k) {   // scipy.ndimage.median_filter, modo 'nearest', k ímpar
+    var n = x.length, h = (k - 1) / 2, out = new Float64Array(n), win = new Float64Array(k), cnt = 0;
+    function ins(v) { var lo = 0, hi = cnt; while (lo < hi) { var m = (lo + hi) >> 1; if (win[m] < v) lo = m + 1; else hi = m; } win.copyWithin(lo + 1, lo, cnt); win[lo] = v; cnt++; }
+    function rem(v) { var lo = 0, hi = cnt; while (lo < hi) { var m = (lo + hi) >> 1; if (win[m] < v) lo = m + 1; else hi = m; } win.copyWithin(lo, lo + 1, cnt); cnt--; }
+    function at(i) { return x[i < 0 ? 0 : (i >= n ? n - 1 : i)]; }
+    for (var j = -h; j <= h; j++) ins(at(j));
+    for (var i = 0; i < n; i++) { out[i] = win[h]; if (i + 1 < n) { rem(at(i - h)); ins(at(i + h + 1)); } }
+    return out;
+  }
+
+  // ---------- Butterworth (scipy.signal.butter) e filtfilt ----------
+  function C(re, im) { return { re: re, im: im || 0 }; }
+  function cadd(a, b) { return C(a.re + b.re, a.im + b.im); }
+  function csub(a, b) { return C(a.re - b.re, a.im - b.im); }
+  function cmul(a, b) { return C(a.re * b.re - a.im * b.im, a.re * b.im + a.im * b.re); }
+  function cdiv(a, b) { var d = b.re * b.re + b.im * b.im; return C((a.re * b.re + a.im * b.im) / d, (a.im * b.re - a.re * b.im) / d); }
+  function csqrt(a) { var r = Math.hypot(a.re, a.im), re = Math.sqrt((r + a.re) / 2), im = Math.sqrt(Math.max(0, (r - a.re) / 2)); return C(re, a.im < 0 ? -im : im); }
+  function poly(raizes) { var c = [C(1)]; raizes.forEach(function (r) { var n = [C(0)].concat(c.map(function () { return C(0); })); for (var i = 0; i < c.length; i++) { n[i] = cadd(n[i], c[i]); n[i + 1] = csub(n[i + 1], cmul(c[i], r)); } c = n; }); return c; }
+  function butter(N, Wn, tipo) {        // tipo 'band' (Wn = [w1, w2]) ou 'low' (Wn = w), normalizado por Nyquist
+    var p = [], z = [], k = 1, i;
+    for (i = -N + 1; i < N; i += 2) { var ang = Math.PI * i / (2 * N); p.push(C(-Math.cos(ang), -Math.sin(ang))); }
+    var fs = 2, fs2 = 2 * fs, grau;
+    if (tipo === 'band') {
+      var w1 = 2 * fs * Math.tan(Math.PI * Wn[0] / fs), w2 = 2 * fs * Math.tan(Math.PI * Wn[1] / fs);
+      var bw = w2 - w1, wo = Math.sqrt(w1 * w2);
+      grau = p.length - z.length;
+      var plp = p.map(function (q) { return C(q.re * bw / 2, q.im * bw / 2); });
+      var pbp = [];
+      plp.forEach(function (q) { pbp.push(cadd(q, csqrt(csub(cmul(q, q), C(wo * wo))))); });
+      plp.forEach(function (q) { pbp.push(csub(q, csqrt(csub(cmul(q, q), C(wo * wo))))); });
+      p = pbp; z = []; for (i = 0; i < grau; i++) z.push(C(0)); k = Math.pow(bw, grau);
+    } else {
+      var w = 2 * fs * Math.tan(Math.PI * Wn / fs);
+      grau = p.length - z.length;
+      p = p.map(function (q) { return C(q.re * w, q.im * w); }); k = Math.pow(w, grau);
+    }
+    grau = p.length - z.length;
+    var numz = C(1), denp = C(1);
+    z.forEach(function (q) { numz = cmul(numz, csub(C(fs2), q)); });
+    p.forEach(function (q) { denp = cmul(denp, csub(C(fs2), q)); });
+    var zz = z.map(function (q) { return cdiv(cadd(C(fs2), q), csub(C(fs2), q)); });
+    var pz = p.map(function (q) { return cdiv(cadd(C(fs2), q), csub(C(fs2), q)); });
+    for (i = 0; i < grau; i++) zz.push(C(-1));
+    k = k * cdiv(numz, denp).re;
+    var b = poly(zz).map(function (c) { return c.re * k; }), a = poly(pz).map(function (c) { return c.re; });
+    return { b: b, a: a };
+  }
+  function lfilter(b, a, x, zi) {
+    var n = Math.max(b.length, a.length), bb = b.slice(), aa = a.slice();
+    while (bb.length < n) bb.push(0); while (aa.length < n) aa.push(0);
+    var a0 = aa[0]; bb = bb.map(function (v) { return v / a0; }); aa = aa.map(function (v) { return v / a0; });
+    var z = zi.slice(), y = new Float64Array(x.length);
+    for (var t = 0; t < x.length; t++) {
+      var xt = x[t], yt = bb[0] * xt + z[0];
+      for (var i = 0; i < n - 2; i++) z[i] = bb[i + 1] * xt + z[i + 1] - aa[i + 1] * yt;
+      z[n - 2] = bb[n - 1] * xt - aa[n - 1] * yt;
+      y[t] = yt;
+    }
+    return y;
+  }
+  function lfilterZi(b, a) {
+    var n = Math.max(b.length, a.length), bb = b.slice(), aa = a.slice();
+    while (bb.length < n) bb.push(0); while (aa.length < n) aa.push(0);
+    var a0 = aa[0]; bb = bb.map(function (v) { return v / a0; }); aa = aa.map(function (v) { return v / a0; });
+    var m = n - 1, M = [], B = [], i, j;
+    for (i = 0; i < m; i++) { M.push(new Array(m).fill(0)); }
+    for (i = 0; i < m; i++) for (j = 0; j < m; j++) {
+      var comp = (i === 0) ? -aa[j + 1] : (j === i - 1 ? 1 : 0);   // companion(a)
+      M[j][i] = (i === j ? 1 : 0) - comp;                            // I - companion(a).T
+    }
+    for (i = 0; i < m; i++) B.push(bb[i + 1] - aa[i + 1] * bb[0]);
+    for (i = 0; i < m; i++) {                                        // eliminação de Gauss com pivô
+      var pv = i; for (j = i + 1; j < m; j++) if (Math.abs(M[j][i]) > Math.abs(M[pv][i])) pv = j;
+      var tmp = M[i]; M[i] = M[pv]; M[pv] = tmp; var tb = B[i]; B[i] = B[pv]; B[pv] = tb;
+      for (j = i + 1; j < m; j++) { var f = M[j][i] / M[i][i]; for (var c = i; c < m; c++) M[j][c] -= f * M[i][c]; B[j] -= f * B[i]; }
+    }
+    var zi = new Array(m).fill(0);
+    for (i = m - 1; i >= 0; i--) { var s = B[i]; for (j = i + 1; j < m; j++) s -= M[i][j] * zi[j]; zi[i] = s / M[i][i]; }
+    return zi;
+  }
+  function filtfilt(ba, x) {
+    var b = ba.b, a = ba.a, pad = 3 * Math.max(a.length, b.length), n = x.length;
+    if (n <= pad) return Float64Array.from(x);
+    var ext = new Float64Array(n + 2 * pad), i;
+    for (i = 0; i < pad; i++) ext[i] = 2 * x[0] - x[pad - i];
+    for (i = 0; i < n; i++) ext[pad + i] = x[i];
+    for (i = 0; i < pad; i++) ext[pad + n + i] = 2 * x[n - 1] - x[n - 2 - i];
+    var zi = lfilterZi(b, a);
+    var y = lfilter(b, a, ext, zi.map(function (v) { return v * ext[0]; }));
+    y.reverse();
+    y = lfilter(b, a, y, zi.map(function (v) { return v * y[0]; }));
+    y.reverse();
+    return y.slice(pad, pad + n);
+  }
+  function filtroPassaBanda(chs, fs, fl, fh, ordem) {
+    fl = fl || 1; fh = Math.min(fh || 50, 0.45 * fs); ordem = ordem || 3;
+    var ba = butter(ordem, [fl / (fs / 2), fh / (fs / 2)], 'band');
+    return chs.map(function (c) { return filtfilt(ba, c); });
+  }
+  function prepararParaDelinear(chs, fs, fcBaixa) {
+    fcBaixa = fcBaixa || 40;
+    var k1 = trunc(0.2 * fs) | 1, k2 = trunc(0.6 * fs) | 1;
+    var ba = butter(3, Math.min(fcBaixa, 0.45 * fs) / (fs / 2), 'low');
+    return chs.map(function (c) {
+      var base = medianFilterNearest(medianFilterNearest(c, k1), k2), d = new Float64Array(c.length);
+      for (var i = 0; i < c.length; i++) d[i] = c[i] - base[i];
+      return filtfilt(ba, d);
+    });
+  }
+
+  // ---------- matriz de distância e detecção de QRS (seção 8) ----------
+  function matrizDistancia(chs, s, W) {     // float32, derivação a derivação (como o Python)
+    var D = new Float32Array(W * W), nc = chs.length, xf = [], c, i, j;
+    for (c = 0; c < nc; c++) { xf.push(Float32Array.from(chs[c].subarray ? chs[c].subarray(s, s + W) : chs[c].slice(s, s + W))); }
+    for (c = 0; c < nc; c++) {
+      var x = xf[c];
+      for (i = 0; i < W; i++) { var xi = x[i], row = i * W; for (j = 0; j < W; j++) { var d = Math.fround(xi - x[j]); D[row + j] = D[row + j] + Math.fround(d * d); } }
+    }
+    for (i = 0; i < D.length; i++) D[i] = Math.sqrt(D[i]);
+    return D;
+  }
+  function selecionar(a, k) {               // k-ésimo menor (quickselect, Floyd–Rivest simplificado), altera a
+    var l = 0, r = a.length - 1;
+    while (r > l) {
+      if (r - l > 600) {
+        var n = r - l + 1, m = k - l + 1, z = Math.log(n), s = 0.5 * Math.exp(2 * z / 3),
+          sd = 0.5 * Math.sqrt(z * s * (n - s) / n) * (m - n / 2 < 0 ? -1 : 1),
+          nl = Math.max(l, Math.floor(k - m * s / n + sd)), nr = Math.min(r, Math.floor(k + (n - m) * s / n + sd));
+        selecionarFaixa(a, k, nl, nr);
+      }
+      var t = a[k], i = l, j = r, tmp;
+      tmp = a[l]; a[l] = a[k]; a[k] = tmp;
+      if (a[r] > t) { tmp = a[r]; a[r] = a[l]; a[l] = tmp; }
+      while (i < j) { tmp = a[i]; a[i] = a[j]; a[j] = tmp; i++; j--; while (a[i] < t) i++; while (a[j] > t) j--; }
+      if (a[l] === t) { tmp = a[l]; a[l] = a[j]; a[j] = tmp; } else { j++; tmp = a[j]; a[j] = a[r]; a[r] = tmp; }
+      if (j <= k) l = j + 1; if (k <= j) r = j - 1;
+    }
+    return a[k];
+  }
+  function selecionarFaixa(a, k, l, r) {
+    while (r > l) {
+      var t = a[k], i = l, j = r, tmp;
+      tmp = a[l]; a[l] = a[k]; a[k] = tmp;
+      if (a[r] > t) { tmp = a[r]; a[r] = a[l]; a[l] = tmp; }
+      while (i < j) { tmp = a[i]; a[i] = a[j]; a[j] = tmp; i++; j--; while (a[i] < t) i++; while (a[j] > t) j--; }
+      if (a[l] === t) { tmp = a[l]; a[l] = a[j]; a[j] = tmp; } else { j++; tmp = a[j]; a[j] = a[r]; a[r] = tmp; }
+      if (j <= k) l = j + 1; if (k <= j) r = j - 1;
+    }
+  }
+  function quantil(D, q) {                  // np.quantile(D, q), interpolação linear
+    var N = D.length, pos = q * (N - 1), k = Math.floor(pos), k2 = Math.min(k + 1, N - 1);
+    var tmp = Float32Array.from(D), vk = selecionar(tmp, k), vk2 = vk;
+    if (k2 > k) { vk2 = Infinity; for (var i = k + 1; i < N; i++) if (tmp[i] < vk2) vk2 = tmp[i]; }
+    return vk + (pos - k) * (vk2 - vk);
+  }
+  function qrsJanela(chs, s, W, fs, o, tudo) {
+    var D = matrizDistancia(chs, s, W);
+    var limD = quantil(D, o.q);
+    if (!isFinite(limD) || limD <= 1e-9) return tudo ? { cent: [], D: D } : { cent: [] };
+    var soma = new Float64Array(W), i, j, mx = 0;
+    for (i = 0; i < W; i++) { var row = i * W; for (j = 0; j < W; j++) if (D[row + j] >= limD) soma[j] += 1; }
+    for (j = 0; j < W; j++) if (soma[j] > mx) mx = soma[j];
+    if (mx <= 0) return tudo ? { cent: [], D: D } : { cent: [] };
+    var limS = o.frac * mx, cols = [];
+    for (j = 0; j < W; j++) if (soma[j] > limS) cols.push(j);
+    var minA = Math.max(1, trunc(pyRound(o.min_s * fs))), eps = Math.max(1.0, o.eps_s * fs);
+    var grupos = [], atual = [];
+    for (i = 0; i < cols.length; i++) {
+      if (atual.length && cols[i] - atual[atual.length - 1] > eps) { grupos.push(atual); atual = []; }
+      atual.push(cols[i]);
+    }
+    if (atual.length) grupos.push(atual);
+    grupos = grupos.filter(function (g) { return g.length >= minA; });
+    var cent = grupos.map(function (g) { var t = 0; g.forEach(function (v) { t += v; }); return t / g.length; });
+    if (tudo) return { cent: cent, D: D, limD: limD, soma: soma, limS: limS, grupos: grupos };
+    return { cent: cent };
+  }
+  function refinarPico(filt, idx, fs, raio) {
+    raio = raio || 0.06;
+    var n = filt[0].length, nrm = new Float64Array(n), i, c;
+    for (i = 0; i < n; i++) { var s = 0; for (c = 0; c < filt.length; c++) s += filt[c][i] * filt[c][i]; nrm[i] = Math.sqrt(s); }
+    var r = Math.max(1, trunc(pyRound(raio * fs))), out = [];
+    idx.forEach(function (v) { var ii = trunc(v), a = Math.max(0, ii - r), b = Math.min(n, ii + r + 1); out.push(b > a ? argmax(nrm, a, b) : ii); });
+    out.sort(function (x, y) { return x - y; });
+    return out.filter(function (v, k) { return k === 0 || v !== out[k - 1]; });
+  }
+  function detectarQRS(chs, fs, opt) {
+    opt = Object.assign({ q: 0.95, frac: 0.75, eps_s: 0.100, min_s: 0.002, win_s: 4.0, passo_s: 3.0, refinar: true, ini: 0, fim: null, progresso: null }, opt || {});
+    var n = chs[0].length, ini = opt.ini, fim = opt.fim == null ? n : Math.min(trunc(opt.fim), n);
+    var pad = trunc(2 * fs), a0 = Math.max(0, ini - pad), b0 = Math.min(n, fim + pad);
+    var filt = filtroPassaBanda(chs.map(function (c) { return c.slice(a0, b0); }), fs);
+    var W = trunc(pyRound(opt.win_s * fs)), P = trunc(pyRound(opt.passo_s * fs)), borda = Math.floor((W - P) / 2);
+    var marcas = [], s0 = ini - a0, sFim = Math.max(ini - a0 + 1, fim - a0 - W + 1), total = Math.ceil((sFim - s0) / P), k = 0;
+    for (var s = s0; s < sFim; s += P, k++) {
+      var Wt = Math.min(W, filt[0].length - s);
+      if (Wt < Math.floor(W / 2)) break;
+      var r = qrsJanela(filt, s, Wt, fs, opt);
+      var lo = (s === ini - a0) ? 0 : borda, hi = (s + W >= fim - a0) ? Wt : W - borda;
+      r.cent.forEach(function (c) { if (c >= lo && c < hi) marcas.push(s + c); });
+      if (opt.progresso && k % 50 === 0) opt.progresso(k / total);
+    }
+    marcas.sort(function (x, y) { return x - y; });
+    var fund = [];
+    if (marcas.length) {
+      var g = [marcas[0]];
+      for (var i = 1; i < marcas.length; i++) {
+        if (marcas[i] - marcas[i - 1] > 0.150 * fs) { fund.push(g.reduce(function (x, y) { return x + y; }, 0) / g.length); g = []; }
+        g.push(marcas[i]);
+      }
+      fund.push(g.reduce(function (x, y) { return x + y; }, 0) / g.length);
+    }
+    var cent = fund.map(function (v) { return pyRound(v + a0); });
+    var pico = opt.refinar && fund.length ? refinarPico(filt, fund.map(pyRound), fs).map(function (v) { return v + a0; }) : null;
+    return { centroide: cent, pico: pico };
+  }
+
+  // ---------- delineação (seção 9) ----------
+  function pontoIsoeletrico(x, r, fs) {
+    var n = x[0].length, nc = x.length, w = Math.max(2, trunc(pyRound(0.02 * fs)));
+    var a = Math.max(0, r + trunc(pyRound(-0.12 * fs))), b = Math.min(n, Math.max(a + w + 1, r + trunc(pyRound(-0.03 * fs))));
+    var L = b - a, c, i, nivel = new Float64Array(nc);
+    if (L - 1 < w) { for (c = 0; c < nc; c++) { var t = 0; for (i = a; i < b; i++) t += x[c][i]; nivel[c] = t / L; } return { nivel: nivel, idx: a }; }
+    var dx = new Float64Array(L - 1);
+    for (i = 0; i < L - 1; i++) { var s = 0; for (c = 0; c < nc; c++) s += Math.abs(x[c][a + i + 1] - x[c][a + i]); dx[i] = s; }
+    var e = new Float64Array(dx.length - w + 1);
+    for (i = 0; i < e.length; i++) { var t2 = 0; for (var j = 0; j < w; j++) t2 += dx[i + j]; e[i] = t2; }
+    var k = argmin(e, 0, e.length);
+    for (c = 0; c < nc; c++) { var t3 = 0; for (i = a + k; i < a + k + w; i++) t3 += x[c][i]; nivel[c] = t3 / w; }
+    return { nivel: nivel, idx: a + k + Math.floor(w / 2) };
+  }
+  function trapFim(y, im, ir) { var best = -Infinity, bi = im; for (var i = im; i <= ir; i++) { var A = 0.5 * (y[im] - y[i]) * (2 * ir - i - im); if (A > best) { best = A; bi = i; } } return bi; }
+  function trapIni(y, im, ir) { var best = -Infinity, bi = ir; for (var i = ir; i <= im; i++) { var A = 0.5 * (y[im] - y[i]) * (i + im - 2 * ir); if (A > best) { best = A; bi = i; } } return bi; }
+  function delinear(x, fs, rAm, alfa, ampTmin) {
+    alfa = alfa == null ? 0.20 : alfa; ampTmin = ampTmin == null ? 0.05 : ampTmin;
+    var n = x[0].length, nc = x.length, r = rAm.slice().sort(function (p, q) { return p - q; }), out = [];
+    function ms(s) { return trunc(pyRound(s * fs)); }
+    for (var k = 1; k < r.length - 1; k++) {
+      var R = r[k], Rn = r[k + 1];
+      if (R - ms(0.2) < 0 || Rn >= n) continue;
+      var iso = pontoIsoeletrico(x, R, fs), a0 = Math.max(0, R - ms(0.25)), a1 = Math.min(n, Rn), L = a1 - a0, i, c;
+      var d = new Float64Array(L);
+      for (i = 0; i < L; i++) { var s = 0; for (c = 0; c < nc; c++) { var v = x[c][a0 + i] - iso.nivel[c]; s += v * v; } d[i] = Math.sqrt(s); }
+      var env = maxFilter1d(d, Math.max(1, ms(0.02))), dT = uniformFilter1d(d, Math.max(1, ms(0.02)));
+      var rl = R - a0, reg = { R: R, iso: iso.idx, RR_s: (Rn - R) / fs };
+      var sEnv = gradiente(env);
+      var i0 = Math.max(0, rl - ms(0.10));
+      var imOn = rl > i0 ? argmax(sEnv, i0, rl + 1) : rl, irOn = Math.max(0, rl - ms(0.12));
+      var qon = imOn > irOn + 1 ? trapIni(env, imOn, irOn) : imOn;
+      var i1 = Math.min(L - 1, rl + ms(0.10)), imOff = argmin(sEnv, rl, i1 + 1), irOff = Math.min(L - 1, rl + ms(0.15));
+      var qfim = irOff > imOff + 1 ? trapFim(env, imOff, irOff) : imOff;
+      reg.QRSon = qon + a0; reg.QRSfim = qfim + a0; reg.amp_QRS = env[rl];
+      var ini = qfim + ms(0.04);
+      var fim = Math.min(rl + ms(Math.min(0.6, 0.7 * (Rn - R) / fs)), (Rn - a0) - ms(0.12), L - 1);
+      reg.Ton = reg.Tpico = reg.Tfim = reg.Ton_faixa = reg.Tfim_faixa = reg.amp_T = NaN;
+      if (fim - ini > ms(0.08)) {
+        var tp = argmax(dT, ini, fim + 1), kIso = iso.idx - a0;
+        var piso = mediana(dT.slice(Math.max(0, kIso - ms(0.01)), kIso + ms(0.01) + 1));
+        var amp = dT[tp] - piso;
+        if (amp >= ampTmin * Math.max(reg.amp_QRS, 1e-9) && ini < tp && tp < fim) {
+          var sg = gradiente(dT), limD = Math.min(L - 1, (Rn - a0) - ms(0.12));
+          var imF = argmin(sg, tp, Math.min(limD, tp + ms(0.20)) + 1), irF = Math.min(limD, imF + ms(0.18));
+          var tf = irF > imF + 1 ? trapFim(dT, imF, irF) : imF;
+          var imI = argmax(sg, ini, tp + 1), to = imI > ini + 1 ? trapIni(dT, imI, ini) : ini;
+          var thr = piso + alfa * amp, ant = -1, dep = -1;
+          for (i = ini; i < tp; i++) if (dT[i] < thr) ant = i;
+          for (i = tp; i <= limD; i++) if (dT[i] < thr) { dep = i; break; }
+          reg.Ton = to + a0; reg.Tpico = tp + a0; reg.Tfim = tf + a0; reg.amp_T = amp;
+          reg.Ton_faixa = ant >= 0 ? ant + 1 + a0 : NaN; reg.Tfim_faixa = dep >= 0 ? dep + a0 : NaN;
+        }
+      }
+      out.push(reg);
+    }
+    return out;
+  }
+
+  // ---------- RR e filtro de ectópicos (marcar_ectopicos) ----------
+  function serieRR(amostras, fs, lo, hi, dif, janela) {
+    lo = lo || 300; hi = hi || 2000; dif = dif == null ? 0.20 : dif; janela = janela || 11;
+    var a = amostras.slice().sort(function (p, q) { return p - q; }), n = a.length - 1;
+    if (n < 2) return { t: [], rr: [], valido: [] };
+    var rr = [], t = [], ok = [], i;
+    for (i = 0; i < n; i++) { rr.push((a[i + 1] - a[i]) / fs * 1000); t.push(a[i + 1] / fs); ok.push(rr[i] >= lo && rr[i] <= hi); }
+    var base = new Array(n).fill(NaN), h = Math.floor(janela / 2);
+    for (i = 0; i < n; i++) { var w = []; for (var j = i - h; j <= i + (janela - 1 - h); j++) if (j >= 0 && j < n && ok[j]) w.push(rr[j]); if (w.length >= 3) base[i] = mediana(w); }
+    for (i = n - 2; i >= 0; i--) if (isNaN(base[i])) base[i] = base[i + 1];
+    for (i = 1; i < n; i++) if (isNaN(base[i])) base[i] = base[i - 1];
+    var ect = rr.map(function (v, k) { return ok[k] && Math.abs(v - base[k]) > dif * base[k]; });
+    var valido = rr.map(function (v, k) { return ok[k] && !ect[k] && !(k > 0 && ect[k - 1]); });
+    return { t: t, rr: rr, valido: valido };
+  }
+
+  return { pyRound: pyRound, butter: butter, filtfilt: filtfilt, filtroPassaBanda: filtroPassaBanda,
+           prepararParaDelinear: prepararParaDelinear, matrizDistancia: matrizDistancia, quantil: quantil,
+           qrsJanela: qrsJanela, detectarQRS: detectarQRS, refinarPico: refinarPico, delinear: delinear,
+           pontoIsoeletrico: pontoIsoeletrico, serieRR: serieRR, medianFilterNearest: medianFilterNearest,
+           maxFilter1d: maxFilter1d, uniformFilter1d: uniformFilter1d };
+})();
+if (typeof module !== 'undefined') module.exports = ALG;
+
+</script>
+<script type="text/plain" id="worker-src">
+self.onmessage = function (ev) {
+  var m = ev.data;
+  try {
+    var fs = m.fs, opt = m.opt;
+    var d = ALG.detectarQRS(m.chs, fs, { q: opt.q, frac: opt.frac, refinar: opt.refinar, ini: m.ini, fim: m.fim,
+      progresso: function (p) { self.postMessage({ tipo: 'prog', p: 0.85 * p }); } });
+    var r = d.pico || d.centroide;
+    self.postMessage({ tipo: 'prog', p: 0.88, msg: 'Delineando QRS e onda T…' });
+    var prep = ALG.prepararParaDelinear(m.chs, fs);
+    var delin = ALG.delinear(prep, fs, r, opt.alfa);
+    var j60 = ALG.pyRound(0.06 * fs);
+    delin.forEach(function (b) {
+      var iso = ALG.pontoIsoeletrico(prep, b.R, fs), j = b.QRSfim + j60;
+      b.ST60 = j < prep[0].length ? prep[0][j] - iso.nivel[0] : NaN;
+    });
+    self.postMessage({ tipo: 'prog', p: 0.95 });
+    var filt = ALG.filtroPassaBanda(m.chs, fs);
+    self.postMessage({ tipo: 'fim', r: r, delin: delin, prep: prep, filt: filt }, prep.map(function (c) { return c.buffer; }).concat(filt.map(function (c) { return c.buffer; })));
+  } catch (e) {
+    self.postMessage({ tipo: 'erro', msg: String(e && e.message || e) });
+  }
+};
+
+</script>
+<script>
+(function () {
+  'use strict';
+  var $ = function (id) { return document.getElementById(id); };
+  var ULTIMO_CSV = null, REC = null, RES = null, VIS = { t0: 0, larg: 6, batSel: -1 }, worker = null;
+
+  // ---------- formatação pt-BR ----------
+  function fmt(v, casas) { if (v == null || !isFinite(v)) return '—'; return v.toLocaleString('pt-BR', { minimumFractionDigits: casas, maximumFractionDigits: casas }); }
+  function mediana(a) { var s = a.filter(isFinite).sort(function (x, y) { return x - y; }); var n = s.length; if (!n) return NaN; return n % 2 ? s[(n - 1) / 2] : (s[n / 2 - 1] + s[n / 2]) / 2; }
+  function estado(msg, erro) { var e = $('estado'); e.textContent = msg || ''; e.classList.toggle('erro', !!erro); }
+  function cor(nome) { return getComputedStyle(document.documentElement).getPropertyValue(nome).trim() || '#888'; }
+
+  // ---------- leitura de arquivos ----------
+  function lerHea(txt) {
+    var linhas = txt.split(/\r?\n/).map(function (l) { return l.trim(); }).filter(function (l) { return l && l[0] !== '#'; });
+    if (!linhas.length) throw new Error('O .hea está vazio.');
+    var r = linhas[0].split(/\s+/);
+    if (r[0].indexOf('/') >= 0) throw new Error('Registros com vários segmentos ainda não são aceitos.');
+    var nsig = parseInt(r[1], 10), fs = parseFloat(r[2]) || 250, nsamp = r[3] ? parseInt(r[3], 10) : null;
+    var sinais = [];
+    for (var i = 1; i <= nsig; i++) {
+      var f = (linhas[i] || '').split(/\s+/);
+      var fmtCampo = f[1] || '16', fmtNum = parseInt(fmtCampo, 10), off = 0;
+      if (/x|:/.test(fmtCampo)) throw new Error('Formato ' + fmtCampo + ' (várias amostras por quadro) não é aceito.');
+      var m = fmtCampo.match(/\+(\d+)/); if (m) off = parseInt(m[1], 10);
+      var gCampo = f[2] || '', ganho = parseFloat(gCampo) || 0, unid = 'mV', base = null;
+      var mb = gCampo.match(/\(([-\d.]+)\)/); if (mb) base = parseFloat(mb[1]);
+      var mu = gCampo.match(/\/(\S+)/); if (mu) unid = mu[1];
+      var adcZero = f[4] != null ? parseInt(f[4], 10) : 0;
+      if (base == null) base = adcZero || 0;
+      if (!ganho) ganho = 200;
+      sinais.push({ arquivo: f[0], fmt: fmtNum, off: off, ganho: ganho, base: base, unid: unid, nome: f.slice(8).join(' ') || ('Derivação ' + i) });
+    }
+    return { nome: r[0], nsig: nsig, fs: fs, nsamp: nsamp, sinais: sinais };
+  }
+  function lerDat(cab, buffers) {
+    var porArq = {}, ordem = [];
+    cab.sinais.forEach(function (s, k) { var a = s.arquivo.split('/').pop(); if (!porArq[a]) { porArq[a] = []; ordem.push(a); } porArq[a].push(k); });
+    var chs = new Array(cab.nsig), n = cab.nsamp;
+    ordem.forEach(function (arq) {
+      var buf = buffers[arq.toLowerCase()];
+      if (!buf) throw new Error('Falta o arquivo ' + arq + ' (selecione o .dat junto com o .hea).');
+      var ids = porArq[arq], s0 = cab.sinais[ids[0]], ns = ids.length, fmtN = s0.fmt, dv = new DataView(buf, s0.off), bytes = buf.byteLength - s0.off, nq;
+      var tam = { 16: 2, 61: 2, 80: 1 }[fmtN];
+      if (fmtN === 212) nq = Math.floor(bytes * 2 / 3 / ns); else if (tam) nq = Math.floor(bytes / tam / ns); else throw new Error('Formato ' + fmtN + ' não é aceito (aceitos: 16, 61, 80, 212).');
+      if (!n || n > nq) n = nq;
+      var brutos = ids.map(function () { return new Float64Array(nq); }), i, j, v;
+      if (fmtN === 212) {
+        var total = nq * ns, p = 0;
+        for (i = 0; i < total; i += 2) {
+          var b0 = dv.getUint8(p), b1 = dv.getUint8(p + 1), b2 = p + 2 < bytes ? dv.getUint8(p + 2) : 0; p += 3;
+          var a = b0 | ((b1 & 0x0f) << 8), b = b2 | ((b1 & 0xf0) << 4);
+          if (a > 2047) a -= 4096; if (b > 2047) b -= 4096;
+          brutos[i % ns][Math.floor(i / ns)] = a === -2048 ? NaN : a;
+          if (i + 1 < total) brutos[(i + 1) % ns][Math.floor((i + 1) / ns)] = b === -2048 ? NaN : b;
+        }
+      } else {
+        for (i = 0; i < nq; i++) for (j = 0; j < ns; j++) {
+          var pos = (i * ns + j) * tam;
+          if (fmtN === 16) { v = dv.getInt16(pos, true); if (v === -32768) v = NaN; }
+          else if (fmtN === 61) { v = dv.getInt16(pos, false); if (v === -32768) v = NaN; }
+          else { v = dv.getUint8(pos) - 128; if (v === -128) v = NaN; }
+          brutos[j][i] = v;
+        }
+      }
+      ids.forEach(function (k, jj) { var s = cab.sinais[k], c = brutos[jj]; for (var t = 0; t < c.length; t++) { var x = (c[t] - s.base) / s.ganho; c[t] = isFinite(x) ? x : 0; } chs[k] = c; });
+    });
+    chs = chs.map(function (c) { return c.slice(0, n); });
+    return { nome: cab.nome, fs: cab.fs, chs: chs, nomes: cab.sinais.map(function (s) { return s.nome; }), unid: cab.sinais.map(function (s) { return s.unid; }), n: n, origem: 'WFDB' };
+  }
+  function lerCsv(txt, fs, colTempo) {
+    var linhas = txt.split(/\r?\n/).filter(function (l) { return l.trim(); });
+    var sep = /;/.test(linhas[0]) ? ';' : (/\t/.test(linhas[0]) ? '\t' : (/,/.test(linhas[0]) ? ',' : /\s+/));
+    var num = function (s) { s = s.trim(); if (sep === ';') s = s.replace(',', '.'); return parseFloat(s); };
+    var cab = linhas[0].split(sep), temCab = cab.some(function (c) { return isNaN(num(c)); });
+    var dados = (temCab ? linhas.slice(1) : linhas).map(function (l) { return l.split(sep).map(num); });
+    var nc = dados[0].length, c0 = colTempo ? 1 : 0;
+    if (nc - c0 < 1) throw new Error('O CSV não tem colunas de sinal.');
+    if (colTempo) { var dt = []; for (var i = 1; i < Math.min(dados.length, 2000); i++) dt.push(dados[i][0] - dados[i - 1][0]); var m = mediana(dt); if (m > 0) fs = Math.round(1 / m); }
+    var chs = []; for (var c = c0; c < nc; c++) { var a = new Float64Array(dados.length); for (var t = 0; t < dados.length; t++) { var v = dados[t][c]; a[t] = isFinite(v) ? v : 0; } chs.push(a); }
+    return { nome: 'CSV', fs: fs, chs: chs, nomes: chs.map(function (_, k) { return temCab ? (cab[k + c0] || '').trim() || ('Coluna ' + (k + 1)) : ('Coluna ' + (k + 1)); }), unid: chs.map(function () { return 'mV'; }), n: dados.length, origem: 'CSV' };
+  }
+
+  // ---------- exemplo sintético ----------
+  function exemplo() {
+    var fs = 250, dur = 90, n = fs * dur, l1 = new Float64Array(n), l2 = new Float64Array(n), s = 7;
+    function rnd() { s |= 0; s = s + 0x6D2B79F5 | 0; var t = Math.imul(s ^ s >>> 15, 1 | s); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }
+    function gauss() { return Math.sqrt(-2 * Math.log(rnd() + 1e-12)) * Math.cos(2 * Math.PI * rnd()); }
+    function g(t, a, c, w) { return a * Math.exp(-0.5 * ((t - c) / w) * ((t - c) / w)); }
+    var tb = 0.6, k = 0, x = 0;
+    while (tb < dur - 1) {
+      x = 0.85 * x + 0.015 * gauss(); var rr = 0.82 + x, pvc = (k === 30 || k === 61);
+      var st = 0.12 * tb / dur;                         // elevação lenta do ST na derivação 1
+      var ini = Math.max(0, Math.floor((tb - 0.5) * fs)), fim = Math.min(n, Math.floor((tb + 0.8) * fs));
+      for (var i = ini; i < fim; i++) {
+        var t = i / fs - tb;
+        if (pvc) { l1[i] += g(t, 1.5, 0, 0.035) + g(t, -0.45, 0.3, 0.08); l2[i] += g(t, -1.1, 0.01, 0.04) + g(t, 0.3, 0.3, 0.08); }
+        else {
+          l1[i] += g(t, 0.13, -0.17, 0.02) + g(t, -0.1, -0.03, 0.008) + g(t, 1.1, 0, 0.011) + g(t, -0.28, 0.032, 0.011) + g(t, st, 0.12, 0.05) + g(t, 0.32, 0.27, 0.045);
+          l2[i] += g(t, 0.07, -0.17, 0.02) - 0.55 * (g(t, 1, 0, 0.011) + g(t, -0.3, 0.032, 0.011)) + g(t, -0.22, 0.27, 0.045);
+        }
+      }
+      tb += pvc ? 0.55 * rr : rr; if (pvc) tb += 0.55 * rr; k++;
+    }
+    for (var j = 0; j < n; j++) { var w = 0.25 * Math.sin(2 * Math.PI * 0.2 * j / fs); l1[j] += w + 0.02 * gauss(); l2[j] += 0.6 * w + 0.02 * gauss(); }
+    return { nome: 'Exemplo sintético', fs: fs, chs: [l1, l2], nomes: ['Derivação 1', 'Derivação 2 (T invertida)'], unid: ['mV', 'mV'], n: n, origem: 'sintético' };
+  }
+
+  // ---------- carregar registro ----------
+  function usarRegistro(rec) {
+    REC = rec; RES = null; VIS.t0 = 0; VIS.batSel = -1;
+    var dur = rec.n / rec.fs;
+    $('ini-s').value = 0; $('ini-s').max = Math.floor(dur);
+    $('dur-min').value = Math.min(30, Math.max(0.1, Math.round(dur / 60 * 10) / 10));
+    var box = $('canais'); box.innerHTML = '';
+    rec.nomes.forEach(function (nm, k) {
+      var id = 'canal-' + k, lb = document.createElement('label'); lb.className = 'check';
+      lb.innerHTML = '<input type="checkbox" id="' + id + '"' + (k < 12 ? ' checked' : '') + '> ' + (nm || ('D' + (k + 1))).replace(/</g, '&lt;');
+      box.appendChild(lb);
+    });
+    $('fonte').innerHTML = '<span>Registro <b>' + rec.nome.replace(/</g, '&lt;') + '</b></span><span><b>' + fmt(rec.fs, 0) + '</b> Hz</span><span><b>' + rec.chs.length + '</b> derivações</span><span>duração <b>' + fmt(dur / 60, 1) + '</b> min</span><span>origem: ' + rec.origem + '</span>';
+    estado('Arquivo carregado. Ajuste o trecho e clique em Analisar.');
+  }
+  $('arquivos').addEventListener('change', function (ev) {
+    var fs = Array.prototype.slice.call(ev.target.files || []);
+    if (!fs.length) return;
+    var hea = fs.filter(function (f) { return /\.hea$/i.test(f.name); })[0], csv = fs.filter(function (f) { return /\.(csv|txt|tsv)$/i.test(f.name); })[0];
+    $('opcoes-csv').hidden = !csv || !!hea;
+    estado('Lendo…');
+    if (hea) {
+      Promise.all([hea.text()].concat(fs.filter(function (f) { return /\.dat$/i.test(f.name); }).map(function (f) { return f.arrayBuffer().then(function (b) { return [f.name.toLowerCase(), b]; }); })))
+        .then(function (r) { var cab = lerHea(r[0]), bufs = {}; r.slice(1).forEach(function (p) { bufs[p[0]] = p[1]; }); usarRegistro(lerDat(cab, bufs)); analisar(); })
+        .catch(function (e) { estado(e.message, true); });
+    } else if (csv) {
+      csv.text().then(function (t) { ULTIMO_CSV = t; usarRegistro(lerCsv(t, parseFloat($('fs-csv').value) || 250, $('col-tempo').checked)); analisar(); })
+        .catch(function (e) { estado('Não consegui ler o CSV: ' + e.message, true); });
+    } else estado('Selecione um .hea com o .dat, ou um .csv.', true);
+  });
+  function relerCsv() { if (!ULTIMO_CSV || !REC || REC.origem !== 'CSV') return; try { usarRegistro(lerCsv(ULTIMO_CSV, parseFloat($('fs-csv').value) || 250, $('col-tempo').checked)); analisar(); } catch (e) { estado(e.message, true); } }
+  $('fs-csv').addEventListener('change', relerCsv);
+  $('col-tempo').addEventListener('change', relerCsv);
+  $('btn-exemplo').addEventListener('click', function () { usarRegistro(exemplo()); analisar(); });
+
+  // ---------- análise (Web Worker) ----------
+  function criarWorker() {
+    var src = $('alg-src').textContent + '\n' + $('worker-src').textContent;
+    return new Worker(URL.createObjectURL(new Blob([src], { type: 'text/javascript' })));
+  }
+  function analisar() {
+    if (!REC) { estado('Carregue um arquivo primeiro.', true); return; }
+    var fs = REC.fs, canais = REC.chs.map(function (_, k) { return k; }).filter(function (k) { var c = $('canal-' + k); return c && c.checked; });
+    if (!canais.length) { estado('Marque pelo menos uma derivação.', true); return; }
+    var ini = Math.max(0, Math.round((parseFloat($('ini-s').value) || 0) * fs));
+    var dur = Math.min(60, Math.max(0.05, parseFloat($('dur-min').value) || 30));
+    var fim = Math.min(REC.n, ini + Math.round(dur * 60 * fs));
+    if (fim - ini < 10 * fs) { estado('O trecho precisa ter pelo menos 10 s.', true); return; }
+    var pad = Math.round(2 * fs), s0 = Math.max(0, ini - pad), s1 = Math.min(REC.n, fim + pad);
+    var chs = canais.map(function (k) { return REC.chs[k].slice(s0, s1); });
+    var opt = { q: parseFloat($('p-q').value), frac: parseFloat($('p-frac').value), refinar: $('p-refino').checked, alfa: parseFloat($('p-alfa').value) };
+    if (worker) worker.terminate();
+    worker = criarWorker();
+    $('btn-analisar').disabled = true; $('progresso').style.width = '0%';
+    var t0 = performance.now();
+    estado('Procurando os QRS…');
+    worker.onmessage = function (ev) {
+      var m = ev.data;
+      if (m.tipo === 'prog') { $('progresso').style.width = Math.round(100 * m.p) + '%'; if (m.msg) estado(m.msg); return; }
+      $('btn-analisar').disabled = false;
+      if (m.tipo === 'erro') { estado('Erro na análise: ' + m.msg, true); return; }
+      $('progresso').style.width = '100%';
+      RES = { s0: s0, ini: ini, fim: fim, fs: fs, canais: canais, r: m.r.map(function (v) { return v + s0; }),
+              delin: m.delin.map(function (b) { var o = {}; Object.keys(b).forEach(function (k) { o[k] = (['RR_s', 'amp_QRS', 'amp_T', 'ST60'].indexOf(k) >= 0) ? b[k] : b[k] + s0; }); return o; }),
+              prep: m.prep, filt: m.filt, bruto: chs, opt: opt };
+      RES.rr = ALG.serieRR(RES.r, fs);
+      VIS.t0 = ini / fs; VIS.batSel = -1;
+      estado(RES.r.length + ' QRS em ' + fmt((fim - ini) / fs / 60, 1) + ' min · ' + fmt((performance.now() - t0) / 1000, 1) + ' s de processamento');
+      resumo(); tabela(); desenharTudo();
+    };
+    worker.onerror = function (e) { $('btn-analisar').disabled = false; estado('Erro na análise: ' + e.message, true); };
+    var envio = chs.map(function (c) { return c.slice(); });
+    worker.postMessage({ chs: envio, fs: fs, ini: ini - s0, fim: fim - s0, opt: opt }, envio.map(function (c) { return c.buffer; }));
+    RES = null;
+  }
+  $('btn-analisar').addEventListener('click', analisar);
+
+  // ---------- medidas ----------
+  function resumo() {
+    var fs = RES.fs, rr = RES.rr, d = RES.delin, todos = [], nn = [], dif = [], i;
+    for (i = 0; i < rr.rr.length; i++) { if (rr.rr[i] >= 300 && rr.rr[i] <= 2000) todos.push(rr.rr[i]); if (rr.valido[i]) nn.push(rr.rr[i]); if (i > 0 && rr.valido[i] && rr.valido[i - 1]) dif.push(rr.rr[i] - rr.rr[i - 1]); }
+    var media = function (a) { return a.reduce(function (x, y) { return x + y; }, 0) / a.length; };
+    var fc = todos.length ? 60000 / media(todos) : NaN;
+    var sdnn = nn.length > 2 ? Math.sqrt(nn.reduce(function (s, v) { var m = media(nn); return s + (v - m) * (v - m); }, 0) / (nn.length - 1)) : NaN;
+    var rmssd = dif.length ? Math.sqrt(media(dif.map(function (v) { return v * v; }))) : NaN;
+    var qrs = d.map(function (b) { return (b.QRSfim - b.QRSon) / fs * 1000; });
+    var qt = d.map(function (b) { return (b.Tfim - b.QRSon) / fs * 1000; });
+    var qtc = d.map(function (b) { return (b.Tfim - b.QRSon) / fs * 1000 / Math.sqrt(b.RR_s); });
+    var st60 = d.map(function (b) { return b.ST60; });
+    var comT = d.filter(function (b) { return isFinite(b.Tfim); }).length;
+    var itens = [['QRS detectados', fmt(RES.r.length, 0), ''], ['FC média', fmt(fc, 0), 'bpm'], ['SDNN', fmt(sdnn, 0), 'ms'], ['RMSSD', fmt(rmssd, 0), 'ms'],
+      ['Duração do QRS', fmt(mediana(qrs), 0), 'ms'], ['QT', fmt(mediana(qt), 0), 'ms'], ['QTc (Bazett)', fmt(mediana(qtc), 0), 'ms'],
+      ['ST60 (deriv. 1)', fmt(mediana(st60), 2), 'mV'], ['Onda T achada', fmt(d.length ? 100 * comT / d.length : NaN, 0), '%']];
+    $('medidas').innerHTML = itens.map(function (it) { return '<div class="medida"><dt>' + it[0] + '</dt><dd>' + it[1] + (it[2] ? '<small>' + it[2] + '</small>' : '') + '</dd></div>'; }).join('');
+  }
+  function tabela() {
+    var fs = RES.fs, d = RES.delin, h = [];
+    d.forEach(function (b, k) {
+      var ms = function (a, z) { return isFinite(a) && isFinite(z) ? fmt((z - a) / fs * 1000, 0) : '—'; };
+      h.push('<tr data-k="' + k + '"><td>' + (k + 1) + '</td><td>' + fmt(b.R / fs, 3) + '</td><td>' + fmt(b.RR_s * 1000, 0) + '</td><td>' + ms(b.QRSon, b.QRSfim) + '</td><td>' + ms(b.QRSon, b.Tfim) + '</td><td>' + ms(b.QRSfim, b.Ton) + '</td><td>' + (isFinite(b.Tfim) ? 'sim' : '—') + '</td><td>' + fmt(b.ST60, 3) + '</td></tr>');
+    });
+    $('corpo').innerHTML = h.join('');
+  }
+  $('corpo').addEventListener('click', function (ev) {
+    var tr = ev.target.closest('tr'); if (!tr || !RES) return;
+    var k = +tr.dataset.k, b = RES.delin[k]; VIS.batSel = k;
+    VIS.t0 = Math.max(RES.ini / RES.fs, b.R / RES.fs - VIS.larg / 2);
+    Array.prototype.forEach.call($('corpo').querySelectorAll('tr.ativo'), function (x) { x.classList.remove('ativo'); });
+    tr.classList.add('ativo'); desenharTudo();
+  });
+  $('btn-copiar').addEventListener('click', function () {
+    if (!RES) return;
+    var fs = RES.fs, cols = ['R', 'QRSon', 'QRSfim', 'Ton', 'Tpico', 'Tfim', 'Ton_faixa', 'Tfim_faixa'];
+    var txt = ['R_s,QRSon_s,QRSfim_s,Ton_s,Tpico_s,Tfim_s,Ton_faixa_s,Tfim_faixa_s,RR_s,ST60_mV'].concat(RES.delin.map(function (b) {
+      return cols.map(function (c) { return isFinite(b[c]) ? (b[c] / fs).toFixed(4) : ''; }).concat([b.RR_s.toFixed(4), isFinite(b.ST60) ? b.ST60.toFixed(4) : '']).join(',');
+    })).join('\n');
+    var ta = $('csv-fallback');
+    var falha = function () { ta.hidden = false; ta.value = txt; ta.focus(); ta.select(); estado('Não deu para copiar automaticamente: o CSV está na caixa abaixo da tabela, já selecionado.'); };
+    try { navigator.clipboard.writeText(txt).then(function () { estado('CSV copiado (' + RES.delin.length + ' batimentos).'); }, falha); } catch (e) { falha(); }
+  });
+
+  // ---------- desenho ----------
+  function prepararTela(cv) {
+    var dpr = window.devicePixelRatio || 1, w = cv.clientWidth, h = cv.clientHeight;
+    if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); }
+    var c = cv.getContext('2d'); c.setTransform(dpr, 0, 0, dpr, 0, 0); c.clearRect(0, 0, w, h);
+    return { c: c, w: w, h: h };
+  }
+  function desenharTac() {
+    var T = prepararTela($('tela-tac')), c = T.c, w = T.w, h = T.h;
+    if (!RES || RES.rr.rr.length < 2) { c.fillStyle = cor('--tinta-2'); c.font = '13px ' + cor('--font-texto'); c.fillText('Sem intervalos para mostrar.', 10, h / 2); return; }
+    var fs = RES.fs, x0 = RES.ini / fs, x1 = RES.fim / fs, rr = RES.rr, ml = 46, mb = 18;
+    var vals = rr.rr.filter(function (v, i) { return rr.valido[i]; }); if (!vals.length) vals = rr.rr;
+    var s = vals.slice().sort(function (a, b) { return a - b; }), lo = s[Math.floor(0.01 * (s.length - 1))], hi = s[Math.ceil(0.99 * (s.length - 1))];
+    var pad = Math.max(40, (hi - lo) * 0.25); lo = Math.max(200, lo - pad); hi = hi + pad;
+    var X = function (t) { return ml + (t - x0) / (x1 - x0) * (w - ml - 8); }, Y = function (v) { return 6 + (1 - (v - lo) / (hi - lo)) * (h - 6 - mb); };
+    c.strokeStyle = cor('--linha'); c.fillStyle = cor('--tinta-2'); c.font = '11px ' + cor('--font-dado'); c.lineWidth = 1;
+    [lo, (lo + hi) / 2, hi].forEach(function (v) { var y = Y(v); c.beginPath(); c.moveTo(ml, y); c.lineTo(w - 8, y); c.stroke(); c.fillText(fmt(v, 0), 4, Math.min(h - mb, Math.max(22, y + 4))); });
+    c.fillText('ms', 4, 11);
+    var vx = X(VIS.t0), vw = Math.max(2, X(VIS.t0 + VIS.larg) - vx);
+    c.fillStyle = cor('--qrs'); c.globalAlpha = 0.14; c.fillRect(vx, 4, vw, h - 4 - mb); c.globalAlpha = 1;
+    for (var i = 0; i < rr.rr.length; i++) {
+      var y = Y(Math.min(hi, Math.max(lo, rr.rr[i])));
+      c.fillStyle = rr.valido[i] ? cor('--tinta') : cor('--acento');
+      c.fillRect(X(rr.t[i]) - 1, y - 1, 2.4, 2.4);
+    }
+    c.fillStyle = cor('--tinta-2'); var nt = 6;
+    for (var k = 0; k <= nt; k++) { var t = x0 + k * (x1 - x0) / nt; var tx = fmt(t, 0) + ' s'; c.fillText(tx, Math.min(w - c.measureText(tx).width - 2, Math.max(ml, X(t) - 12)), h - 4); }
+  }
+  function sinalVis() { var v = $('sinal-vis').value; return v === 'filt' ? RES.filt : (v === 'bruto' ? RES.bruto : RES.prep); }
+  function desenharEcg() {
+    var T = prepararTela($('tela-ecg')), c = T.c, w = T.w, h = T.h;
+    if (!RES) return;
+    var fs = RES.fs, sig = sinalVis(), nc = Math.min(sig.length, 4), ml = 8, mr = 8, mt = 8, mb = 22;
+    var t0 = VIS.t0, t1 = VIS.t0 + VIS.larg, a = Math.max(0, Math.round(t0 * fs) - RES.s0), b = Math.min(sig[0].length, Math.round(t1 * fs) - RES.s0);
+    var X = function (t) { return ml + (t - t0) / (t1 - t0) * (w - ml - mr); };
+    var faixa = [];
+    for (var k = 0; k < nc; k++) { var seg = Array.prototype.slice.call(sig[k].subarray(a, b)).sort(function (p, q) { return p - q; }); if (seg.length) faixa.push([seg[Math.floor(0.005 * (seg.length - 1))], seg[Math.ceil(0.995 * (seg.length - 1))]]); else faixa.push([-1, 1]); }
+    var amp = Math.max.apply(null, faixa.map(function (f) { return f[1] - f[0]; })) * 1.15 || 1;
+    var laneH = (h - mt - mb) / nc, pxmv = laneH / amp;
+    // papel de ECG
+    var pxs = (w - ml - mr) / (t1 - t0), passos = [[0.04, 0.1, '--grade-fina', 1], [0.2, 0.5, '--grade-grossa', 1]];
+    passos.forEach(function (p) {
+      if (p[0] * pxs < 4 || p[1] * pxmv < 4) return;
+      c.strokeStyle = cor(p[2]); c.lineWidth = p[3]; c.beginPath();
+      for (var t = Math.ceil(t0 / p[0]) * p[0]; t <= t1; t += p[0]) { var x = Math.round(X(t)) + 0.5; c.moveTo(x, mt); c.lineTo(x, h - mb); }
+      for (var y = h - mb; y >= mt; y -= p[1] * pxmv) { var yy = Math.round(y) + 0.5; c.moveTo(ml, yy); c.lineTo(w - mr, yy); }
+      c.stroke();
+    });
+    // marcações
+    var d = RES.delin.filter(function (bt) { return bt.R / fs >= t0 - 1 && bt.R / fs <= t1 + 1; });
+    d.forEach(function (bt) {
+      var sel = RES.delin.indexOf(bt) === VIS.batSel;
+      c.globalAlpha = sel ? 0.32 : 0.18; c.fillStyle = cor('--qrs');
+      c.fillRect(X(bt.QRSon / fs), mt, Math.max(1, X(bt.QRSfim / fs) - X(bt.QRSon / fs)), h - mt - mb);
+      if (isFinite(bt.Ton) && isFinite(bt.Tfim)) { c.fillStyle = cor('--onda-t'); c.globalAlpha = sel ? 0.34 : 0.2; c.fillRect(X(bt.Ton / fs), mt, Math.max(1, X(bt.Tfim / fs) - X(bt.Ton / fs)), h - mt - mb); }
+      c.globalAlpha = 1;
+      if (isFinite(bt.Tpico)) { c.strokeStyle = cor('--onda-t'); c.lineWidth = 2; c.beginPath(); c.moveTo(X(bt.Tpico / fs), mt); c.lineTo(X(bt.Tpico / fs), mt + 10); c.moveTo(X(bt.Tpico / fs), h - mb - 10); c.lineTo(X(bt.Tpico / fs), h - mb); c.stroke(); }
+      c.setLineDash([4, 3]); c.strokeStyle = cor('--onda-t'); c.lineWidth = 1.3;
+      ['Ton_faixa', 'Tfim_faixa'].forEach(function (p) { if (isFinite(bt[p])) { var x = X(bt[p] / fs); c.beginPath(); c.moveTo(x, mt); c.lineTo(x, h - mb); c.stroke(); } });
+      c.setLineDash([]);
+      if (sel) { c.strokeStyle = cor('--tinta'); c.lineWidth = 1.5; c.strokeRect(X(bt.QRSon / fs) - 3, mt + 1, (isFinite(bt.Tfim) ? X(bt.Tfim / fs) : X(bt.QRSfim / fs)) - X(bt.QRSon / fs) + 6, h - mt - mb - 2); }
+    });
+    RES.r.forEach(function (r) { var t = r / fs; if (t < t0 || t > t1) return; var x = X(t); c.fillStyle = cor('--qrs'); c.beginPath(); c.moveTo(x - 5, mt); c.lineTo(x + 5, mt); c.lineTo(x, mt + 7); c.fill(); });
+    // traçados
+    c.lineWidth = 1.4; c.lineJoin = 'round';
+    for (k = 0; k < nc; k++) {
+      var meio = (faixa[k][0] + faixa[k][1]) / 2, yc = mt + laneH * (k + 0.5);
+      c.strokeStyle = cor('--tinta'); c.beginPath();
+      var passo = Math.max(1, Math.floor((b - a) / ((w - ml - mr) * 2)));
+      for (var i = a; i < b; i += passo) { var x2 = X((i + RES.s0) / fs), y2 = yc - (sig[k][i] - meio) * pxmv; if (i === a) c.moveTo(x2, y2); else c.lineTo(x2, y2); }
+      c.stroke();
+      c.fillStyle = cor('--tinta-2'); c.font = '600 11.5px ' + cor('--font-titulo');
+      var nm = (REC.nomes[RES.canais[k]] || ('D' + (k + 1)));
+      c.fillText(nm, ml + 4, mt + laneH * k + 14);
+    }
+    c.fillStyle = cor('--tinta-2'); c.font = '11px ' + cor('--font-dado');
+    for (var t = Math.ceil(t0); t <= t1; t += (VIS.larg > 6 ? 2 : 1)) { var tx = fmt(t, 0) + ' s'; c.fillText(tx, X(t) - c.measureText(tx).width / 2, h - 6); }
+    if (sig.length > 4) { c.fillText('mostrando 4 de ' + sig.length + ' derivações', w - 190, h - 6); }
+  }
+  function turbo(x) {
+    x = Math.max(0, Math.min(1, x));
+    var r = 34.61 + x * (1172.33 - x * (10793.56 - x * (33300.12 - x * (38394.49 - x * 14825.05))));
+    var g = 23.31 + x * (557.33 + x * (1225.33 - x * (3574.96 - x * (1073.77 + x * 707.56))));
+    var b = 27.2 + x * (3211.1 - x * (15327.97 - x * (27814 - x * (22569.18 - x * 6838.66))));
+    return [Math.max(0, Math.min(255, r)), Math.max(0, Math.min(255, g)), Math.max(0, Math.min(255, b))];
+  }
+  var LUT = []; for (var li = 0; li < 256; li++) LUT.push(turbo(li / 255));
+  function desenharMatriz() {
+    var cv = $('tela-mat'), cs = $('tela-soma');
+    var Ts = prepararTela(cs);
+    if (!RES) { prepararTela(cv); return; }
+    var fs = RES.fs, Wmax = 1200, W = Math.min(Math.round(4 * fs), Wmax), dur = W / fs;
+    var s = Math.max(0, Math.round(VIS.t0 * fs) - RES.s0); if (s + W > RES.filt[0].length) s = Math.max(0, RES.filt[0].length - W);
+    W = Math.min(W, RES.filt[0].length - s);
+    var r = ALG.qrsJanela(RES.filt, s, W, fs, { q: RES.opt.q, frac: RES.opt.frac, eps_s: 0.1, min_s: 0.002 }, true);
+    $('info-mat').textContent = 'Janela de ' + fmt(dur, 1) + ' s a partir de ' + fmt((s + RES.s0) / fs, 1) + ' s, sinal filtrado 1–50 Hz. Percentil ' + fmt(100 * RES.opt.q, 0) + ' % = ' + fmt(r.limD, 2) + ' mV.';
+    var lado = Math.min(cv.parentElement.clientWidth - 28, 440);
+    cv.style.width = lado + 'px'; cv.style.height = lado + 'px';
+    var dpr = window.devicePixelRatio || 1, px = Math.round(lado * dpr);
+    cv.width = px; cv.height = px;
+    var c = cv.getContext('2d'), img = c.createImageData(px, px), D = r.D, mx = 0, i;
+    for (i = 0; i < D.length; i++) if (D[i] > mx) mx = D[i];
+    var bin = $('vis-mat').value === 'b', escuro = cor('--papel');
+    for (var y = 0; y < px; y++) {
+      var iy = Math.min(W - 1, Math.floor(y / px * W));
+      for (var x = 0; x < px; x++) {
+        var ix = Math.min(W - 1, Math.floor(x / px * W)), v = D[iy * W + ix], o = (y * px + x) * 4, rgb;
+        if (bin) { var on = v >= r.limD ? 255 : 0; rgb = [on, on, on]; } else rgb = LUT[Math.round(255 * v / (mx || 1))];
+        img.data[o] = rgb[0]; img.data[o + 1] = rgb[1]; img.data[o + 2] = rgb[2]; img.data[o + 3] = 255;
+      }
+    }
+    c.putImageData(img, 0, 0);
+    // soma das colunas
+    var cc = Ts.c, w = Ts.w, h = Ts.h, soma = r.soma, sm = 0; if (soma) for (i = 0; i < soma.length; i++) if (soma[i] > sm) sm = soma[i];
+    if (!soma) return;
+    var X = function (k) { return 4 + k / (W - 1) * (w - 8); }, Y = function (v) { return h - 16 - v / (sm || 1) * (h - 26); };
+    cc.strokeStyle = cor('--tinta'); cc.lineWidth = 1.2; cc.beginPath();
+    for (i = 0; i < W; i++) { if (i === 0) cc.moveTo(X(i), Y(soma[i])); else cc.lineTo(X(i), Y(soma[i])); }
+    cc.stroke();
+    cc.setLineDash([5, 4]); cc.strokeStyle = cor('--acento'); cc.beginPath(); cc.moveTo(4, Y(r.limS)); cc.lineTo(w - 4, Y(r.limS)); cc.stroke(); cc.setLineDash([]);
+    cc.fillStyle = cor('--qrs'); r.cent.forEach(function (k) { cc.beginPath(); cc.arc(X(k), Y(soma[Math.round(k)]), 4, 0, 2 * Math.PI); cc.fill(); });
+    cc.fillStyle = cor('--tinta-2'); cc.font = '11px ' + cor('--font-dado');
+    cc.fillText('soma das colunas · limiar ' + fmt(100 * RES.opt.frac, 0) + ' % do máximo · ● QRS', 6, h - 3);
+  }
+  var pend = false;
+  function desenharTudo() { if (pend) return; pend = true; requestAnimationFrame(function () { pend = false; desenharTac(); desenharEcg(); desenharMatriz(); }); }
+
+  // ---------- navegação ----------
+  function mover(f) { if (!RES) return; var a = RES.ini / RES.fs, z = RES.fim / RES.fs - VIS.larg; VIS.t0 = Math.max(a, Math.min(z, VIS.t0 + f * VIS.larg * 0.8)); desenharTudo(); }
+  $('btn-ant').addEventListener('click', function () { mover(-1); });
+  $('btn-prox').addEventListener('click', function () { mover(1); });
+  $('tela-ecg').addEventListener('keydown', function (e) { if (e.key === 'ArrowLeft') { mover(-1); e.preventDefault(); } if (e.key === 'ArrowRight') { mover(1); e.preventDefault(); } });
+  $('zoom').addEventListener('change', function () { VIS.larg = parseFloat($('zoom').value); desenharTudo(); });
+  $('sinal-vis').addEventListener('change', desenharTudo);
+  $('vis-mat').addEventListener('change', desenharTudo);
+  $('tela-tac').addEventListener('click', function (e) {
+    if (!RES) return; var rc = e.currentTarget.getBoundingClientRect(), ml = 46, x = e.clientX - rc.left;
+    var a = RES.ini / RES.fs, z = RES.fim / RES.fs, t = a + (x - ml) / (rc.width - ml - 8) * (z - a);
+    VIS.t0 = Math.max(a, Math.min(z - VIS.larg, t - VIS.larg / 2)); desenharTudo();
+  });
+  if (window.ResizeObserver) new ResizeObserver(desenharTudo).observe(document.querySelector('main.area'));
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', desenharTudo);
+  new MutationObserver(desenharTudo).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+
+  if (window.innerWidth < 600) { VIS.larg = 3; $('zoom').value = '3'; }
+  usarRegistro(exemplo()); analisar();
+})();
+
+</script>
+
+</html>
