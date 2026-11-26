@@ -58,6 +58,7 @@ body.soltar::after { content: "Solte o arquivo para analisar"; position: fixed; 
 aside.controles { background: var(--painel); border: 1px solid var(--linha); border-radius: 6px; padding: 16px; display: grid; gap: 16px; }
 @media (min-width: 901px) { aside.controles { position: sticky; top: calc(12px + env(safe-area-inset-top, 0px)); max-height: calc(100vh - 24px); overflow-y: auto; overflow-x: hidden; } }
 .param { position: relative; display: grid; gap: 4px; padding-bottom: 10px; border-bottom: 1px dashed var(--linha); }
+[hidden] { display: none !important; }
 .param-cab { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .param-cab label { font-weight: 500; }
 .ajuda { position: static; flex: none; }
@@ -249,9 +250,22 @@ a { color: var(--qrs); }
 
         <div class="param">
           <div class="param-cab">
+            <span class="param-nome" id="l-versao">Onda T</span>
+            <span class="ajuda"><button type="button" class="ajuda-btn" aria-label="O que muda entre as versões da onda T" aria-describedby="tt-versao">?</button>
+              <span class="tt" role="tooltip" id="tt-versao">Muda onde a página procura a onda T. A versão 1 pega o maior valor da curva de distância numa janela fixa depois do ponto J. A versão 2 olha só onde a T pode estar pela fisiologia (até 0,5·√RR depois do R, e no mínimo 200 ms antes do R seguinte) e escolhe o pico mais destacado, não o mais alto. Assim evita cair na onda P seguinte quando a frequência é alta. As bordas saem pelo método do trapézio nas duas.<br><br>Na versão 2, a T fica <b>incerta</b> quando o destaque do pico é menor que 10 % da amplitude do QRS. No traçado, ela aparece hachurada.<br><br>No TCC (18 registros da QTDB não vistos no desenho da versão 2), a versão 2 marcou o fim da T em 100 % dos batimentos, com desvio-padrão de 66,4 ms e viés de 10,4 ms. Só nas T confiáveis, 56,3 ms. A versão 1 marcou 91,7 %, com 81,4 ms e viés de 27,7 ms.</span></span>
+          </div>
+          <div class="seg" role="radiogroup" aria-labelledby="l-versao">
+            <label><input type="radio" name="p-versao" value="1"><span class="v">Versão 1</span><span class="m">81 ms</span></label>
+            <label><input type="radio" name="p-versao" value="2" checked><span class="v">Versão 2</span><span class="m">66 ms <i class="melhor" title="melhor no TCC">★</i></span></label>
+          </div>
+          <p class="seg-leg">Erro no fim da T (DP) · menor é melhor</p>
+        </div>
+
+        <div class="param" id="param-alfa" hidden>
+          <div class="param-cab">
             <span class="param-nome" id="l-alfa">Faixa da onda T</span>
             <span class="ajuda"><button type="button" class="ajuda-btn" aria-label="O que faz a faixa da onda T" aria-describedby="tt-alfa">?</button>
-              <span class="tt" role="tooltip" id="tt-alfa">Muda só as linhas tracejadas do traçado. A marcação principal da onda T (área laranja) vem do método do trapézio e não depende deste ajuste. As linhas tracejadas marcam onde a curva de distância, descendo do pico da T, cruza essa porcentagem da altura da onda.<br><br>No TCC (20 %, 18 registros da QTDB não usados no ajuste), o fim da T saiu em 74,8 % dos batimentos, com desvio-padrão de 108 ms. O trapézio marcou 91,7 %, com 81 ms. 10 % e 30 % não foram testados.</span></span>
+              <span class="tt" role="tooltip" id="tt-alfa">Só existe na versão 1 e muda só as linhas tracejadas do traçado. A marcação principal da onda T (área laranja) vem do método do trapézio e não depende deste ajuste. As linhas tracejadas marcam onde a curva de distância, descendo do pico da T, cruza essa porcentagem da altura da onda.<br><br>No TCC (20 %, 18 registros da QTDB não usados no ajuste), o fim da T saiu em 74,8 % dos batimentos, com desvio-padrão de 108 ms. O trapézio marcou 91,7 %, com 81 ms. 10 % e 30 % não foram testados.</span></span>
           </div>
           <div class="seg" role="radiogroup" aria-labelledby="l-alfa">
             <label><input type="radio" name="p-alfa" value="0.1"><span class="v">10 %</span><span class="m sem">—</span></label>
@@ -311,7 +325,8 @@ a { color: var(--qrs); }
           <span><i style="background:var(--qrs);opacity:.25"></i>QRS (início → ponto J)</span>
           <span><i style="background:var(--onda-t);opacity:.3"></i>Onda T (início → fim, trapézio)</span>
           <span><i style="background:var(--onda-t)"></i>Pico da T</span>
-          <span><i style="border:1.5px dashed var(--onda-t);background:none"></i>Bordas da T pela faixa</span>
+          <span class="so-v2"><i style="background:repeating-linear-gradient(135deg,var(--onda-t) 0 2px,transparent 2px 5px);opacity:.6"></i>T incerta (pico pouco destacado)</span>
+          <span class="so-v1" hidden><i style="border:1.5px dashed var(--onda-t);background:none"></i>Bordas da T pela faixa</span>
           <span>Grade: 0,2 s × 0,5 mV</span>
         </div>
       </section>
@@ -341,7 +356,7 @@ a { color: var(--qrs); }
 
       <footer>
         <p><b>Detecção do QRS:</b> método de Nicole Charron (TCC, Engenharia Biomédica, UFPE), usado com autorização: matriz de distância do ECG, binarização no percentil 95 %, soma das colunas, limiar de 75 % do máximo e agrupamento DBSCAN. Código original em <a href="https://github.com/Ni-cole17/PTB-Diagnostic-Visualization" target="_blank" rel="noopener">github.com/Ni-cole17/PTB-Diagnostic-Visualization</a>. Em arquivos acima de 500 Hz, a matriz usa o sinal filtrado reduzido para 250–500 Hz (a taxa da validação do TCC é 250 Hz); o pico R e a delineação continuam na taxa original. Num ECG adulto a 1000 Hz, os batimentos encontrados foram os mesmos, com a análise 16 vezes mais rápida.</p>
-        <p><b>Bordas do QRS e da onda T:</b> Felipe G. Papani (TCC, UFPE). Cada amostra é medida pela distância à linha isoelétrica do batimento (uma coluna da matriz de distância), e as bordas saem pelo método do trapézio (Vázquez-Seisdedos et al., 2011) ou pela largura da faixa. Mesma implementação do código do TCC em Python, conferida amostra a amostra.</p>
+        <p><b>Bordas do QRS e da onda T:</b> Felipe G. Papani (TCC, UFPE). Cada amostra é medida pela distância à linha isoelétrica do batimento (uma coluna da matriz de distância), e as bordas saem pelo método do trapézio (Vázquez-Seisdedos et al., 2011). Por padrão, a onda T segue a versão 2 do TCC: o pico é o máximo mais destacado de d(n) entre o ponto J e R + 0,5·√RR (e até 200 ms antes do R seguinte), e a T é marcada como incerta quando esse destaque fica abaixo de 10 % da amplitude do QRS. A versão 1 (máximo numa janela fixa, com bordas também pela largura da faixa) continua disponível para comparar. Mesma implementação do código do TCC em Python, conferida amostra a amostra nas duas versões.</p>
         <p><b>Como citar:</b> PAPANI, F. G. <i>Matriz de distância do eletrocardiograma na delineação de batimentos e na análise do segmento ST antes da fibrilação ventricular</i>. 2026. Trabalho de Conclusão de Curso (Bacharelado em Engenharia Biomédica) – Universidade Federal de Pernambuco, Recife, 2026. Código e resultados em <a href="https://github.com/felipepapani/tcc-ecg-fv" target="_blank" rel="noopener">github.com/felipepapani/tcc-ecg-fv</a> (licença MIT).</p>
         <p><b>Medidas:</b> QRS = início ao ponto J; QT = início do QRS ao fim da T; ST = ponto J ao início da T; ST60 = nível 60 ms após o ponto J menos o nível isoelétrico (derivação 1). FC, SDNN e RMSSD usam só intervalos entre 300 e 2000 ms que passam no filtro de ectópicos de 20 %. Ferramenta de pesquisa: não use para diagnóstico.</p>
       </footer>
@@ -638,8 +653,32 @@ var ALG = (function () {
   }
   function trapFim(y, im, ir) { var best = -Infinity, bi = im; for (var i = im; i <= ir; i++) { var A = 0.5 * (y[im] - y[i]) * (2 * ir - i - im); if (A > best) { best = A; bi = i; } } return bi; }
   function trapIni(y, im, ir) { var best = -Infinity, bi = ir; for (var i = ir; i <= im; i++) { var A = 0.5 * (y[im] - y[i]) * (i + im - 2 * ir); if (A > best) { best = A; bi = i; } } return bi; }
-  function delinear(x, fs, rAm, alfa, ampTmin) {
-    alfa = alfa == null ? 0.20 : alfa; ampTmin = ampTmin == null ? 0.05 : ampTmin;
+  // scipy.signal.find_peaks(y, prominence=0): máximos locais (platô → meio do platô; as bordas nunca são pico)
+  // e a proeminência de cada um (_peak_prominences, sem wlen). Devolve { pk: [...], prom: [...] }.
+  function picosComProeminencia(y) {
+    var n = y.length, pk = [], prom = [], i = 1, iMax = n - 1;
+    while (i < iMax) {
+      if (y[i - 1] < y[i]) {
+        var ia = i + 1;
+        while (ia < iMax && y[ia] === y[i]) ia++;
+        if (y[ia] < y[i]) { pk.push(Math.floor((i + ia - 1) / 2)); i = ia; }
+      }
+      i++;
+    }
+    pk.forEach(function (p) {
+      var v = y[p], j = p, minE = v, minD = v;
+      while (j >= 0 && y[j] <= v) { if (y[j] < minE) minE = y[j]; j--; }
+      j = p; while (j <= n - 1 && y[j] <= v) { if (y[j] < minD) minD = y[j]; j++; }
+      prom.push(v - Math.max(minE, minD));
+    });
+    return { pk: pk, prom: prom };
+  }
+  // versao 1: pico da T = maior valor de d(n) na janela antiga, com bordas também pela faixa (alfa).
+  // versao 2 (a do TCC): janela fisiológica até R + qtc_max·√RR e no máximo R_seguinte − 200 ms; pico = máximo local
+  // mais proeminente; T confiável se a proeminência for ≥ 10 % da amplitude do QRS. Porte de delinear_batimentos (tcc_lib.py).
+  function delinear(x, fs, rAm, alfa, ampTmin, versao, qtcMax, folgaP, promMin) {
+    alfa = alfa == null ? 0.20 : alfa; ampTmin = ampTmin == null ? 0.05 : ampTmin; versao = versao || 1;
+    qtcMax = qtcMax == null ? 0.50 : qtcMax; folgaP = folgaP == null ? 0.20 : folgaP; promMin = promMin == null ? 0.10 : promMin;
     var n = x[0].length, nc = x.length, r = rAm.slice().sort(function (p, q) { return p - q; }), out = [];
     function ms(s) { return trunc(pyRound(s * fs)); }
     for (var k = 1; k < r.length - 1; k++) {
@@ -659,7 +698,26 @@ var ALG = (function () {
       reg.QRSon = qon + a0; reg.QRSfim = qfim + a0; reg.amp_QRS = env[rl];
       var ini = qfim + ms(0.04);
       var fim = Math.min(rl + ms(Math.min(0.6, 0.7 * (Rn - R) / fs)), (Rn - a0) - ms(0.12), L - 1);
-      reg.Ton = reg.Tpico = reg.Tfim = reg.Ton_faixa = reg.Tfim_faixa = reg.amp_T = NaN;
+      reg.Ton = reg.Tpico = reg.Tfim = reg.Ton_faixa = reg.Tfim_faixa = reg.amp_T = reg.T_prom = NaN; reg.T_confiavel = false;
+      if (versao === 2) {
+        var limD2 = Math.min(L - 1, (Rn - a0) - ms(folgaP));
+        var fim2 = Math.min(rl + ms(qtcMax * Math.sqrt((Rn - R) / fs)), limD2);
+        if (fim2 - ini > ms(0.04)) {
+          var pp = picosComProeminencia(dT.subarray(ini, fim2 + 1));
+          if (pp.pk.length) {
+            var jm = argmax(pp.prom, 0, pp.prom.length), tp2 = ini + pp.pk[jm], prom = pp.prom[jm], kIso2 = iso.idx - a0;
+            var piso2 = mediana(dT.slice(Math.max(0, kIso2 - ms(0.01)), kIso2 + ms(0.01) + 1));
+            var sg2 = gradiente(dT);
+            var imF2 = argmin(sg2, tp2, Math.min(limD2, tp2 + ms(0.20)) + 1), irF2 = Math.min(limD2, imF2 + ms(0.18));
+            var tf2 = irF2 > imF2 + 1 ? trapFim(dT, imF2, irF2) : imF2;
+            var imI2 = argmax(sg2, ini, tp2 + 1), to2 = imI2 > ini + 1 ? trapIni(dT, imI2, ini) : ini;
+            reg.Ton = to2 + a0; reg.Tpico = tp2 + a0; reg.Tfim = tf2 + a0; reg.amp_T = dT[tp2] - piso2;
+            reg.T_prom = prom; reg.T_confiavel = prom >= promMin * Math.max(reg.amp_QRS, 1e-9);
+          }
+        }
+        out.push(reg);
+        continue;
+      }
       if (fim - ini > ms(0.08)) {
         var tp = argmax(dT, ini, fim + 1), kIso = iso.idx - a0;
         var piso = mediana(dT.slice(Math.max(0, kIso - ms(0.01)), kIso + ms(0.01) + 1));
@@ -717,7 +775,7 @@ self.onmessage = function (ev) {
     var r = d.pico || d.centroide;
     self.postMessage({ tipo: 'prog', p: 0.88, msg: 'Delineando QRS e onda T…' });
     var prep = ALG.prepararParaDelinear(m.chs, fs);
-    var delin = ALG.delinear(prep, fs, r, opt.alfa);
+    var delin = ALG.delinear(prep, fs, r, opt.alfa, 0.05, opt.versao);
     var j60 = ALG.pyRound(0.06 * fs);
     delin.forEach(function (b) {
       var iso = ALG.pontoIsoeletrico(prep, b.R, fs), j = b.QRSfim + j60;
@@ -1002,7 +1060,7 @@ self.onmessage = function (ev) {
     var pad = Math.round(2 * fs), s0 = Math.max(0, ini - pad), s1 = Math.min(REC.n, fim + pad);
     var chs = canais.map(function (k) { return REC.chs[k].slice(s0, s1); });
     var marcado = function (n) { return document.querySelector('input[name="' + n + '"]:checked').value; };
-    var opt = { q: parseFloat(marcado('p-q')), frac: parseFloat(marcado('p-frac')), refinar: marcado('p-refino') === '1', alfa: parseFloat(marcado('p-alfa')) };
+    var opt = { q: parseFloat(marcado('p-q')), frac: parseFloat(marcado('p-frac')), refinar: marcado('p-refino') === '1', alfa: parseFloat(marcado('p-alfa')), versao: parseInt(marcado('p-versao'), 10) };
     if (worker) worker.terminate();
     worker = criarWorker();
     $('btn-analisar').disabled = true; $('progresso').style.width = '0%';
@@ -1015,12 +1073,12 @@ self.onmessage = function (ev) {
       if (m.tipo === 'erro') { estado('Erro na análise: ' + m.msg, true); return; }
       $('progresso').style.width = '100%';
       RES = { s0: s0, ini: ini, fim: fim, fs: fs, canais: canais, r: m.r.map(function (v) { return v + s0; }),
-              delin: m.delin.map(function (b) { var o = {}; Object.keys(b).forEach(function (k) { o[k] = (['RR_s', 'amp_QRS', 'amp_T', 'ST60'].indexOf(k) >= 0) ? b[k] : b[k] + s0; }); return o; }),
+              delin: m.delin.map(function (b) { var o = {}; Object.keys(b).forEach(function (k) { o[k] = (['RR_s', 'amp_QRS', 'amp_T', 'ST60', 'T_prom', 'T_confiavel'].indexOf(k) >= 0) ? b[k] : b[k] + s0; }); return o; }),
               prep: m.prep, filt: m.filt, bruto: chs, opt: opt };
       RES.rr = ALG.serieRR(RES.r, fs);
       VIS.t0 = ini / fs; VIS.batSel = -1;
       estado(RES.r.length + ' QRS em ' + fmt((fim - ini) / fs / 60, 1) + ' min · ' + fmt((performance.now() - t0) / 1000, 1) + ' s de processamento');
-      resumo(); tabela(); desenharTudo();
+      legendaVersao(opt.versao); resumo(); tabela(); desenharTudo();
     };
     worker.onerror = function (e) { $('btn-analisar').disabled = false; estado('Erro na análise: ' + e.message, true); };
     var envio = chs.map(function (c) { return c.slice(); });
@@ -1028,6 +1086,15 @@ self.onmessage = function (ev) {
     RES = null;
   }
   $('btn-analisar').addEventListener('click', analisar);
+  // a faixa só existe na versão 1; a legenda segue a versão da última análise
+  function legendaVersao(v) {
+    Array.prototype.forEach.call(document.querySelectorAll('.legenda .so-v1'), function (e) { e.hidden = v !== 1; });
+    Array.prototype.forEach.call(document.querySelectorAll('.legenda .so-v2'), function (e) { e.hidden = v !== 2; });
+  }
+  Array.prototype.forEach.call(document.querySelectorAll('input[name="p-versao"]'), function (el) {
+    el.addEventListener('change', function () { $('param-alfa').hidden = el.value !== '1'; });
+    if (el.checked) $('param-alfa').hidden = el.value !== '1';   // o navegador pode restaurar a escolha ao recarregar
+  });
 
   // ---------- medidas ----------
   function resumo() {
@@ -1041,17 +1108,18 @@ self.onmessage = function (ev) {
     var qt = d.map(function (b) { return (b.Tfim - b.QRSon) / fs * 1000; });
     var qtc = d.map(function (b) { return (b.Tfim - b.QRSon) / fs * 1000 / Math.sqrt(b.RR_s); });
     var st60 = d.map(function (b) { return b.ST60; });
-    var comT = d.filter(function (b) { return isFinite(b.Tfim); }).length;
+    var v2 = RES.opt.versao === 2;
+    var comT = d.filter(function (b) { return v2 ? b.T_confiavel : isFinite(b.Tfim); }).length;
     var itens = [['QRS detectados', fmt(RES.r.length, 0), ''], ['FC média', fmt(fc, 0), 'bpm'], ['SDNN', fmt(sdnn, 0), 'ms'], ['RMSSD', fmt(rmssd, 0), 'ms'],
       ['Duração do QRS', fmt(mediana(qrs), 0), 'ms'], ['QT', fmt(mediana(qt), 0), 'ms'], ['QTc (Bazett)', fmt(mediana(qtc), 0), 'ms'],
-      ['ST60 (deriv. 1)', fmt(mediana(st60), 2), 'mV'], ['Onda T achada', fmt(d.length ? 100 * comT / d.length : NaN, 0), '%']];
+      ['ST60 (deriv. 1)', fmt(mediana(st60), 2), 'mV'], [v2 ? 'Onda T confiável' : 'Onda T achada', fmt(d.length ? 100 * comT / d.length : NaN, 0), '%']];
     $('medidas').innerHTML = itens.map(function (it) { return '<div class="medida"><dt>' + it[0] + '</dt><dd>' + it[1] + (it[2] ? '<small>' + it[2] + '</small>' : '') + '</dd></div>'; }).join('');
   }
   function tabela() {
     var fs = RES.fs, d = RES.delin, h = [];
     d.forEach(function (b, k) {
       var ms = function (a, z) { return isFinite(a) && isFinite(z) ? fmt((z - a) / fs * 1000, 0) : '—'; };
-      h.push('<tr data-k="' + k + '"><td>' + (k + 1) + '</td><td>' + fmt(b.R / fs, 3) + '</td><td>' + fmt(b.RR_s * 1000, 0) + '</td><td>' + ms(b.QRSon, b.QRSfim) + '</td><td>' + ms(b.QRSon, b.Tfim) + '</td><td>' + ms(b.QRSfim, b.Ton) + '</td><td>' + (isFinite(b.Tfim) ? 'sim' : '—') + '</td><td>' + fmt(b.ST60, 3) + '</td></tr>');
+      h.push('<tr data-k="' + k + '"><td>' + (k + 1) + '</td><td>' + fmt(b.R / fs, 3) + '</td><td>' + fmt(b.RR_s * 1000, 0) + '</td><td>' + ms(b.QRSon, b.QRSfim) + '</td><td>' + ms(b.QRSon, b.Tfim) + '</td><td>' + ms(b.QRSfim, b.Ton) + '</td><td>' + (!isFinite(b.Tfim) ? '—' : (RES.opt.versao === 2 && !b.T_confiavel ? 'incerta' : 'sim')) + '</td><td>' + fmt(b.ST60, 3) + '</td></tr>');
     });
     $('corpo').innerHTML = h.join('');
   }
@@ -1065,8 +1133,12 @@ self.onmessage = function (ev) {
   $('btn-copiar').addEventListener('click', function () {
     if (!RES) return;
     var fs = RES.fs, cols = ['R', 'QRSon', 'QRSfim', 'Ton', 'Tpico', 'Tfim', 'Ton_faixa', 'Tfim_faixa'];
-    var txt = ['R_s,QRSon_s,QRSfim_s,Ton_s,Tpico_s,Tfim_s,Ton_faixa_s,Tfim_faixa_s,RR_s,ST60_mV'].concat(RES.delin.map(function (b) {
-      return cols.map(function (c) { return isFinite(b[c]) ? (b[c] / fs).toFixed(4) : ''; }).concat([b.RR_s.toFixed(4), isFinite(b.ST60) ? b.ST60.toFixed(4) : '']).join(',');
+    var v2 = RES.opt.versao === 2;
+    if (v2) cols = cols.slice(0, 6);   // a faixa só existe na versão 1
+    var cab = cols.map(function (c) { return c + '_s'; }).concat(['RR_s', 'ST60_mV'], v2 ? ['T_confiavel'] : []).join(',');
+    var txt = [cab].concat(RES.delin.map(function (b) {
+      return cols.map(function (c) { return isFinite(b[c]) ? (b[c] / fs).toFixed(4) : ''; }).concat([b.RR_s.toFixed(4), isFinite(b.ST60) ? b.ST60.toFixed(4) : ''],
+        v2 ? [isFinite(b.Tfim) ? (b.T_confiavel ? '1' : '0') : ''] : []).join(',');
     })).join('\n');
     var ta = $('csv-fallback');
     var falha = function () { ta.hidden = false; ta.value = txt; ta.focus(); ta.select(); estado('Não deu para copiar automaticamente: o CSV está na caixa abaixo da tabela, já selecionado.'); };
@@ -1127,7 +1199,16 @@ self.onmessage = function (ev) {
       var sel = RES.delin.indexOf(bt) === VIS.batSel;
       c.globalAlpha = sel ? 0.32 : 0.18; c.fillStyle = cor('--qrs');
       c.fillRect(X(bt.QRSon / fs), mt, Math.max(1, X(bt.QRSfim / fs) - X(bt.QRSon / fs)), h - mt - mb);
-      if (isFinite(bt.Ton) && isFinite(bt.Tfim)) { c.fillStyle = cor('--onda-t'); c.globalAlpha = sel ? 0.34 : 0.2; c.fillRect(X(bt.Ton / fs), mt, Math.max(1, X(bt.Tfim / fs) - X(bt.Ton / fs)), h - mt - mb); }
+      if (isFinite(bt.Ton) && isFinite(bt.Tfim)) {
+        var xa = X(bt.Ton / fs), wT = Math.max(1, X(bt.Tfim / fs) - xa);
+        c.fillStyle = cor('--onda-t');
+        if (RES.opt.versao === 2 && !bt.T_confiavel) {   // T incerta: hachurada, sem preenchimento cheio
+          c.save(); c.beginPath(); c.rect(xa, mt, wT, h - mt - mb); c.clip();
+          c.globalAlpha = sel ? 0.5 : 0.35; c.strokeStyle = cor('--onda-t'); c.lineWidth = 1.2; c.beginPath();
+          for (var hx = xa - (h - mt - mb); hx < xa + wT; hx += 7) { c.moveTo(hx, h - mb); c.lineTo(hx + (h - mt - mb), mt); }
+          c.stroke(); c.restore();
+        } else { c.globalAlpha = sel ? 0.34 : 0.2; c.fillRect(xa, mt, wT, h - mt - mb); }
+      }
       c.globalAlpha = 1;
       if (isFinite(bt.Tpico)) { c.strokeStyle = cor('--onda-t'); c.lineWidth = 2; c.beginPath(); c.moveTo(X(bt.Tpico / fs), mt); c.lineTo(X(bt.Tpico / fs), mt + 10); c.moveTo(X(bt.Tpico / fs), h - mb - 10); c.lineTo(X(bt.Tpico / fs), h - mb); c.stroke(); }
       c.setLineDash([4, 3]); c.strokeStyle = cor('--onda-t'); c.lineWidth = 1.3;

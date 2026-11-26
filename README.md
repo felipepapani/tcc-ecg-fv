@@ -35,7 +35,7 @@ resultados/
   csv/                          todos os números citados no texto (numeros_tcc.csv é a tabela-resumo)
   figuras/                      figuras do TCC
 docs/index.html                 ferramenta web (publicada pelo GitHub Pages)
-testes/                         testes dos leitores de arquivo da ferramenta web (EDF, WFDB, CSV)
+testes/                         testes da ferramenta web: leitores de arquivo (EDF, WFDB, CSV) e delineação contra tcc_lib.py
 ```
 
 ## Ferramenta web
@@ -43,6 +43,11 @@ testes/                         testes dos leitores de arquivo da ferramenta web
 A página [felipepapani.github.io/tcc-ecg-fv](https://felipepapani.github.io/tcc-ecg-fv/) roda a detecção de QRS pela
 matriz de distância e a delineação do QRS e da onda T no navegador. O arquivo é lido localmente e não é enviado a
 nenhum servidor. É uma ferramenta de pesquisa, não de diagnóstico.
+
+A onda T segue, por padrão, a **versão 2** da delineação (a avaliada no TCC: fim da T com desvio-padrão de 66,4 ms
+nos registros não vistos da QTDB). A T é marcada como incerta, e aparece hachurada, quando o destaque do pico em d(n) fica
+abaixo de 10 % da amplitude do QRS; o CSV exportado traz essa marca na coluna `T_confiavel`. A versão 1 continua
+selecionável para comparação.
 
 ### Formatos aceitos
 
@@ -71,6 +76,19 @@ node testes/testar_leitores.mjs     # Node 18 ou mais novo
 Com registros reais do PhysioNet, a leitura também coincidiu amostra a amostra com a das bibliotecas: `sel30` da QTDB
 (WFDB formato 212, 2 derivações, 15 min) e `r01.edf` da ADFECGDB (EDF+, 5 canais a 1000 Hz, com anotações). Para repetir
 com outros arquivos, gere um `casos.json` no mesmo formato e rode `node testes/testar_leitores.mjs <pasta>`.
+
+### Teste da delineação
+
+`testes/gerar_delineacao.py` delineia sinais sintéticos (70 e 130 bpm, T achatada, ST elevado com ruído) com
+`tcc_lib.delinear_batimentos`, nas versões 1 e 2, e `testes/testar_delineacao.mjs` refaz tudo com o JavaScript da página a
+partir dos mesmos picos R. Os pontos (em amostras) e a marca de T confiável têm de ser idênticos; as amplitudes, iguais até
+10⁻⁶ mV. Registros WFDB passados como argumento entram também, com os picos do xqrs (com `sel30` da QTDB, os 1013
+batimentos coincidiram nas duas versões).
+
+```bash
+python testes/gerar_delineacao.py [caminho/do/registro ...]
+node testes/testar_delineacao.mjs
+```
 
 ## Dados
 

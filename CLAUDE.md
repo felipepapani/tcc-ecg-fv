@@ -30,6 +30,6 @@ orientador Prof. Fernando José Ribeiro Sales). O texto do TCC (LaTeX) fica no r
 ## Pendências deste repositório
 
 - Gerar o DOI no Zenodo (GitHub → release) e colocar no README e no texto do TCC (metodos.tex, marcador PENDENTE).
-- A página web (`docs/index.html`) usa a versão 1 da delineação da onda T; o TCC declara isso. Atualizar para a
-  versão 2 exige portar a versão 2 de `delinear_batimentos` de `tcc_lib.py` para o JavaScript embutido e mudar a frase do texto.
+- A página web (`docs/index.html`) agora usa a versão 2 da onda T por padrão (v1 selecionável), conferida contra
+  `tcc_lib.py` por `testes/testar_delineacao.mjs`. Falta mudar no texto do TCC as frases que dizem que a página usa a versão 1.
 - Opcional: repetir o sorteio dos pseudo-eventos muitas vezes; reamostrar a SDDB para 128 Hz.
